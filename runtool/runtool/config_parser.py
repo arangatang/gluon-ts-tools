@@ -1,13 +1,11 @@
 import itertools
 import math
 import re
+from typing import Callable, Any, Union
 from functools import partial, singledispatch
 from uuid import uuid4
-
 from runtool.datatypes import Versions, DotDict
 from runtool.utils import update_nested_dict, get_item_from_path
-
-from typing import Callable, Any, Union
 
 
 @singledispatch
@@ -139,8 +137,8 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
     children = {}
     for key in node:
         child = recursive_apply(node[key], fn)
-        if type(child) is Versions:
-            expanded_children.append(itertools.product([key], child.versions))
+        if isinstance(child, Versions):
+            expanded_children.append(itertools.product([key], child))
         else:
             children[key] = child
     as_dicts = [dict(ver) for ver in itertools.product(*expanded_children)]
@@ -150,7 +148,7 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
 
     for dct in as_dicts:
         dct.update(children)
-    return Versions(versions=as_dicts)
+    return Versions.parse_obj(as_dicts)
 
 
 @recursive_apply.register
@@ -175,7 +173,7 @@ def recursive_apply_list(node: list, fn: Callable) -> Any:
             # child = Versions([1,2])
             # =>
             # expanded_child_version = ((index, 1), (index, 2))
-            expanded_child_version = itertools.product([index], child.versions)
+            expanded_child_version = itertools.product([index], child)
             versions_in_children.append(expanded_child_version)
         else:
             child_normal[index] = child
@@ -192,7 +190,7 @@ def recursive_apply_list(node: list, fn: Callable) -> Any:
             new_data[index] = value
         new_versions.append(new_data)
 
-    return Versions(versions=new_versions)
+    return Versions.parse_obj(new_versions)
 
 
 def apply_from(node: dict, data: dict) -> dict:
@@ -332,7 +330,7 @@ def apply_eval(node, locals):
 
 
 def apply_each(node, context):
-    # should return th different versions
+    # should return the different versions
     # item.e. $each: [1,2] should return two versions in an array
 
     each = recursive_apply(
@@ -353,16 +351,16 @@ def apply_each(node, context):
             each = new
         else:
             each = [item if not item == "$None" else None for item in each]
-        return Versions(versions=each)
+        return Versions.parse_obj(each)
     elif isinstance(each, dict):
         seperated_dicts = [{key, val} for key, val in each.items()]
         for a_dict in seperated_dicts:
             a_dict.update(node)
-        return Versions(versions=seperated_dicts)
+        return Versions.parse_obj(seperated_dicts)
     elif isinstance(each, Versions):
         # when having a nested $each this will be triggered
-        flattened = itertools.chain.from_iterable(each.versions)
-        return Versions(versions=list(flattened))
+        flattened = itertools.chain.from_iterable(each)
+        return Versions.parse_obj(list(flattened))
     else:
         print("Something went wrong when expanding $each")
         raise NotImplementedError
@@ -399,19 +397,13 @@ def do_each(node, context):
     return node
 
 
-def to_list(data):
-    if type(data) is Versions:
-        return data.versions
-    else:
-        return [data]
-
-
 def apply_transformations(data):
     data = recursive_apply(data, partial(do_from, context=data))
     data = recursive_apply(data, partial(do_eval, locals=data))
     data = recursive_apply(data, partial(do_each, context=data))
+
+    data = list(data) if isinstance(data, Versions) else [data]
     data = [
-        recursive_apply(item, partial(do_ref, context=item))
-        for item in to_list(data)
+        recursive_apply(item, partial(do_ref, context=item)) for item in data
     ]
     return data

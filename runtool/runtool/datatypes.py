@@ -3,16 +3,19 @@ from typing import Any, List
 
 
 class Versions(BaseModel):
-    versions: List
+    __root__: List[Any]
 
     def __repr__(self):
-        return f"Versions({self.versions})"
+        return f"Versions({self.__root__})"
 
-    def __getitem__(self, key):
-        return self.versions[key]
+    def __getitem__(self, item):
+        return self.__root__[item]
 
     def __len__(self):
-        return len(self.versions)
+        return len(self.__root__)
+
+    def __iter__(self):
+        return iter(self.__root__)
 
 
 class DotDict(dict):
