@@ -1,11 +1,12 @@
 import itertools
 import math
 import re
-from typing import Callable, Any, Union
 from functools import partial, singledispatch
+from typing import Any, Callable, Union
 from uuid import uuid4
-from runtool.datatypes import Versions, DotDict
-from runtool.utils import update_nested_dict, get_item_from_path
+
+from runtool.datatypes import DotDict, Versions
+from runtool.utils import get_item_from_path, update_nested_dict
 
 
 @singledispatch
