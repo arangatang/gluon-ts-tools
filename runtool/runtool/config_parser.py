@@ -398,7 +398,7 @@ def apply_trial(node: dict, locals: dict) -> Any:
     """
 
     # find longest working path for each match in locals
-    for match in re.finditer(regex, text):
+    for match in re.finditer(regex, text, flags=re.VERBOSE):
         substring, value = recurse_eval(match[0], locals, do_trial)
 
         if isinstance(value, dict) and "$eval" in value:
