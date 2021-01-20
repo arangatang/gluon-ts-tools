@@ -247,7 +247,7 @@ def evaluate(text: str, locals: dict) -> Any:
     16.0
     """
     uid = str(uuid4()).split("-")[-1]
-    locals = {**DotDict(locals)}
+    locals = dict(DotDict(locals))
     globals = {**math.__dict__, "uid": uid}
     ret = eval(
         text,
@@ -336,24 +336,30 @@ def apply_eval(node: dict, locals: dict) -> Any:
     text = str(node["$eval"])
     text = text.replace("$trial", "__trial__")
 
-    # find all matches of $.somestring.somotherstring[0]['dsd']["sdasda"] ...
-    matches = {
-        text[item.start() : item.end()]: text[item.start() + 2 : item.end()]
-        for item in re.finditer(
-            r"(\$(?:(?:\[[0-9]+\])|(?:\[(?:\'|\")[a-zA-Z_0-9$]+(?:\'|\")\])|(?:\.[a-zA-Z_0-9]+))+)",
-            text,
+    # matches any parts of the text which is similar to this:
+    # $.somestring.somotherstring[0]['a_key']["some_key"]
+    regex = r"""
+        (\$                         # match string starting with $ and followed by:
+            (?:
+                \[[\d]+\]|          # digits enclosed in [] i.e. $[0]
+                \[\"[\w_\d$]+\"\]|  # words or digits in "[]" i.e. $["0"]
+                \[\'[\w_\d$]+\'\]|  # words or digits in '[]' i.e. $['0']
+                \.[\w_\d]+          # words or digits prepended with a dot, i.e. $.hello
+            )+
         )
-    }
+    """
 
-    for path in matches.values():
-        current_path, value = recurse_eval(path, locals, do_eval)
-        current_path = f"$.{current_path}"
+    # replace any matched substrings of the text with whatever the
+    # substrings pointed to in the locals parameter
+    for match in re.finditer(regex, text, flags=re.VERBOSE):
+        path, value = recurse_eval(match[0].lstrip("$."), locals, do_eval)
+        path = f"$.{path}"
         if isinstance(value, dict) and "$eval" in value:
-            text = text.replace(current_path, f"({value['$eval']})")
+            text = text.replace(path, f"({value['$eval']})")
         elif type(value) is str:
-            text = text.replace(current_path, f"'{value}'")
+            text = text.replace(path, f"'{value}'")
         else:
-            text = text.replace(current_path, str(value))
+            text = text.replace(path, str(value))
 
     try:
         return evaluate(text, locals)
@@ -372,7 +378,7 @@ def apply_trial(node: dict, locals: dict) -> Any:
     For more information read the documentation of `apply_eval`.
 
     >>> apply_trial(
-    ...     {"$eval" : "2 + __trial__.something.0"},
+    ...     {"$eval" : "2 + __trial__.something[0]"},
     ...     {"__trial__": {"something":[1,2,3]}}
     ... )
     3
@@ -380,18 +386,20 @@ def apply_trial(node: dict, locals: dict) -> Any:
     assert len(node) == 1, "$eval needs to be only value"
     text = str(node["$eval"])
 
-    # dict used to remove duplicates
-    matches = {
-        text[item.start() : item.end()]: None
-        for item in re.finditer(
-            r"(__trial__(?:(?:\[[0-9]+\])|(?:\[(?:\'|\")[a-zA-Z_0-9$]+(?:\'|\")\])|(?:\.[a-zA-Z_0-9]+))+)",
-            text,
+    regex = r"""
+        (__trial__
+            (?:
+                \[[\d]+\]|          # digits enclosed in [] i.e. __trial__[0]
+                \[\"[\w_\d$]+\"\]|  # words or digits in "[]" i.e. __trial__["0"]
+                \[\'[\w_\d$]+\'\]|  # words or digits in '[]' i.e. __trial__['0']
+                \.\w+[\w_\d]*       # words or digits prepended with a dot, i.e. __trial__.hell0
+            )+
         )
-    }
+    """
 
     # find longest working path for each match in locals
-    for path in matches:
-        substring, value = recurse_eval(path, locals, do_trial)
+    for match in re.finditer(regex, text):
+        substring, value = recurse_eval(match[0], locals, do_trial)
 
         if isinstance(value, dict) and "$eval" in value:
             raise TypeError("$eval: $trial cannot resolve to value")
