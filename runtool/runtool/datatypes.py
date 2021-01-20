@@ -18,7 +18,7 @@ class Versions(BaseModel):
     Versions([1, 2, 3])
     """
 
-    __root__: List[Any]
+    __root__: List[Any]  # using __root__: breaks doctest for this file
 
     def __repr__(self):
         return f"Versions({self.__root__})"
@@ -57,3 +57,29 @@ class DotDict(dict):
                     self[key] = DotDict(value)
             else:
                 self[key] = value
+
+    def as_dict(self) -> dict:
+        """
+        Converts the DotDict into a python `dict` recursively.
+
+        >>> dotdict = DotDict({"a": {"b": {"c": [0, DotDict({"d": 1})]}}})
+        >>> type(dotdict)
+        <class 'datatypes.DotDict'>
+        >>> type(dotdict.a.b.c[1])
+        <class 'datatypes.DotDict'>
+        >>> as_dict = dotdict.as_dict()
+        >>> type(as_dict)
+        <class 'dict'>
+        >>> type(as_dict["a"]["b"]["c"][1])
+        <class 'dict'>
+        """
+
+        def convert(value: Any) -> Any:
+            if isinstance(value, DotDict):
+                return value.as_dict()
+            elif isinstance(value, list):
+                return list(map(convert, value))
+            else:
+                return value
+
+        return {key: convert(value) for key, value in self.items()}
