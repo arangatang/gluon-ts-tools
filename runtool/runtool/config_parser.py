@@ -2,7 +2,7 @@ import itertools
 import math
 import re
 from functools import partial, singledispatch
-from typing import Any, Callable, Union, Tuple
+from typing import Any, Callable, Tuple, Union
 from uuid import uuid4
 
 from runtool.datatypes import DotDict, Versions
@@ -365,7 +365,7 @@ def apply_eval(node: dict, locals: dict) -> Any:
             raise error
 
 
-def apply_trial(node, locals):
+def apply_trial(node: dict, locals: dict) -> Any:
     """
     Works similarly as `apply_eval` however this method only evaluates
     the parts of `node["$eval"]` which starts with __trial__.
@@ -467,30 +467,55 @@ def apply_each(node: dict) -> Versions:
 
 # DO: find correct place within the data to do the transformation
 def do_from(node, context):
+    """
+    If the node is a dict and has `"$from"` as a key calls
+    `runtool.config_parser.apply_from` and returns the results.
+    Otherwise returns the node.
+    """
     if isinstance(node, dict) and "$from" in node:
         return apply_from(node, context)
     return node
 
 
 def do_ref(node, context):
+    """
+    If the node is a dict and has `"$ref"` as a key calls
+    `runtool.config_parser.apply_ref` and returns the results.
+    Otherwise returns the node.
+    """
     if isinstance(node, dict) and "$ref" in node:
         return apply_ref(node, context)
     return node
 
 
 def do_eval(node, locals):
+    """
+    If the node is a dict and has `"$eval"` as a key calls
+    `runtool.config_parser.apply_eval` and returns the results.
+    Otherwise returns the node.
+    """
     if isinstance(node, dict) and "$eval" in node:
         return apply_eval(node, locals)
     return node
 
 
 def do_trial(node, locals):
+    """
+    If the node is a dict and has `"$eval"` as a key calls
+    `runtool.config_parser.apply_trial` and returns the results.
+    Otherwise returns the node.
+    """
     if isinstance(node, dict) and "$eval" in node:
         return apply_trial(node, locals)
     return node
 
 
 def do_each(node):
+    """
+    If the node is a dict and has `"$each"` as a key calls
+    `runtool.config_parser.apply_each` and returns the results.
+    Otherwise returns the node.
+    """
     if isinstance(node, dict) and "$each" in node:
         return apply_each(node)
     return node
@@ -518,8 +543,6 @@ def apply_transformations(data: dict) -> list:
     ... ]
     >>> apply_transformations(node) == expected
     True
-
-
     """
     data = recursive_apply(data, partial(do_from, context=data))
     data = recursive_apply(data, partial(do_eval, locals=data))
