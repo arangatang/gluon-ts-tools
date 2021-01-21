@@ -1,5 +1,5 @@
-import runtool.config_parser as config_parser
+from runtool import transformer
 
 
 def parse(data):
-    return config_parser.apply_transformations(data)
+    return transformer.apply_transformations(data)

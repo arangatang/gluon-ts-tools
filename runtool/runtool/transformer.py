@@ -477,7 +477,7 @@ def apply_each(node: dict) -> Versions:
 def do_from(node, context):
     """
     If the node is a dict and has `"$from"` as a key calls
-    `runtool.config_parser.apply_from` and returns the results.
+    `runtool.json_transformer.apply_from` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$from" in node:
@@ -488,7 +488,7 @@ def do_from(node, context):
 def do_ref(node, context):
     """
     If the node is a dict and has `"$ref"` as a key calls
-    `runtool.config_parser.apply_ref` and returns the results.
+    `runtool.json_transformer.apply_ref` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$ref" in node:
@@ -499,7 +499,7 @@ def do_ref(node, context):
 def do_eval(node, locals):
     """
     If the node is a dict and has `"$eval"` as a key calls
-    `runtool.config_parser.apply_eval` and returns the results.
+    `runtool.json_transformer.apply_eval` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$eval" in node:
@@ -510,7 +510,7 @@ def do_eval(node, locals):
 def do_trial(node, locals):
     """
     If the node is a dict and has `"$eval"` as a key calls
-    `runtool.config_parser.apply_trial` and returns the results.
+    `runtool.json_transformer.apply_trial` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$eval" in node:
@@ -521,7 +521,7 @@ def do_trial(node, locals):
 def do_each(node):
     """
     If the node is a dict and has `"$each"` as a key calls
-    `runtool.config_parser.apply_each` and returns the results.
+    `runtool.json_transformer.apply_each` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$each" in node:
