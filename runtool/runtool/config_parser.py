@@ -90,19 +90,12 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
     """
     Applies `fn` to each element in the dict, if `fn` changes the node,
     the changes should be returned. If the `fn` foes not change the node,
-    we recurse the children of the node.
+    it calls `recursive_apply` on the children of the node.
 
     In case the recursion on the children results in one or more
     `runtool.datatypes.Versions` objects, the cartesian product of these
     versions is calculated and a new `runtool.datatypes.Versions` object will be
     returned containing the different versions of this node.
-
-    i.e. instead of returning::
-
-        {"a":1, "b":Versions([1,2])}
-
-    this method would return::
-        Versions([{"a":1, "b":1}, {"a":1, "b":2}}
 
     """
     # basecase of recursion, if `fn` modifies the node, return the new node
