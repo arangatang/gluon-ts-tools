@@ -1,6 +1,7 @@
 import itertools
 import math
 import re
+import json
 from functools import partial, singledispatch
 from typing import Any, Callable, Tuple, Union
 from uuid import uuid4
@@ -12,51 +13,74 @@ from runtool.utils import get_item_from_path, update_nested_dict
 @singledispatch
 def recursive_apply(node, fn: Callable) -> Any:
     """
-    Applies a function to dict nodes in a JSON-like structure.
-    The node that the function is applied to will be replaced with what `fn` returns.
+    Applies a function to `dict` nodes in a JSON-like structure.
+    The node that the function is applied to will be replaced with what
+    `fn` returns. If the `fn` generates `runtool.datatypes.Versions`
+    objects are merged into a new `runtool.datatypes.Versions` object
+    and returned.
 
-    Simple example:
+    NOTE::
+        `runtool.datatypes.Versions` represents different versions of an object.
 
-    >>> node = {"this": "is removed", "double": 1}
-    >>> fn = lambda dct: 2 * dct["double"] if "double" in dct else dct
-    >>> recursive_apply(node, fn)
+    In the following examples we will transform a JSON structure using
+    the `transform` function defined below.
+
+    >>> def transform(node):
+    ...     '''
+    ...     Converts node to a version object or multiplies it by 2
+    ...     '''
+    ...     if "version" in node:
+    ...         return Versions.parse_obj(node["version"])
+    ...     if "double" in node:
+    ...         return 2 * node["double"]
+    ...     return node
+
+    Below is a simple example where the node is replaced with 2 after `transform`
+    is applied to it.
+
+    >>> recursive_apply(
+    ...     {"double": 1},
+    ...     fn = transform
+    ... )
     2
 
-    Another example:
+    If the JSON structure contains nested nodes, `recursive_apply` applies `fn`
+    to each `dict` node in the tree and replaces the node with whatever `fn` returns.
 
-    >>> node = {
-    ...     "this": "stays",
-    ...     "double_this": {
-    ...         "this": "is removed",
-    ...         "double": 2
+    >>> recursive_apply(
+    ...     {
+    ...         "no_double": 2,
+    ...         "double_this": {
+    ...             "double": 2
+    ...         },
     ...     },
-    ... }
-    >>> fn = lambda node: 2 * node["double"] if "double" in node else node
-    >>> recursive_apply(node, fn)
-    {'this': 'stays', 'double_this': 4}
-
-    If the `fn` generates `runtool.datatypes.Versions` objects these `Versions`
-    object are merged and returned.
-    This happens for example when `fn` is `runtool.config_parser.do_each`
-    see example below:
-
-    >>> node = {
-    ...     "my_list": [
-    ...         {"hello": "there"},
-    ...         {"a": {"$each": [1, 2]}},
-    ...         {"b": {"$each": [3, 4]}},
-    ...     ]
-    ... }
-    >>> fn = partial(do_each)
-    >>> recursive_apply(node, fn) == Versions.parse_obj(
-    ...     [
-    ...         {"my_list": [{"hello": "there"}, {"a": 1}, {"b": 3}]},
-    ...         {"my_list": [{"hello": "there"}, {"a": 1}, {"b": 4}]},
-    ...         {"my_list": [{"hello": "there"}, {"a": 2}, {"b": 3}]},
-    ...         {"my_list": [{"hello": "there"}, {"a": 2}, {"b": 4}]},
-    ...     ]
+    ...     fn = transform
     ... )
-    True
+    {'no_double': 2, 'double_this': 4}
+
+    In the below example two `runtool.datatypes.Versions` will be created by
+    the `transform` function. `recursive_apply` merges these and thus the result
+    of `recursive_apply` will here be a `runtool.datatypes.Versions` object.
+
+    >>> result = recursive_apply(
+    ...     {
+    ...         "my_list": [
+    ...             {"hello": "there"},
+    ...             {"a": {"version": [1, 2]}},
+    ...             {"b": {"version": [3, 4]}},
+    ...         ]
+    ...     },
+    ...     fn = transform
+    ... )
+    >>> type(result)
+    <class 'runtool.datatypes.Versions'>
+    >>> for version in result:
+    ...     print(version)
+    {'my_list': [{'hello': 'there'}, {'a': 1}, {'b': 3}]}
+    {'my_list': [{'hello': 'there'}, {'a': 1}, {'b': 4}]}
+    {'my_list': [{'hello': 'there'}, {'a': 2}, {'b': 3}]}
+    {'my_list': [{'hello': 'there'}, {'a': 2}, {'b': 4}]}
+
     """
     return node
 
@@ -68,51 +92,17 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
     the changes should be returned. If the `fn` foes not change the node,
     we recurse the children of the node.
 
-    In case the recursion on the children results in `runtool.datatypes.Versions` objects,
-    we need to merge these and return a new `runtool.datatypes.Versions` object.
-    If no children are `runtool.datatypes.Versions` objects, we return the children.
+    In case the recursion on the children results in one or more
+    `runtool.datatypes.Versions` objects, the cartesian product of these
+    versions is calculated and a new `runtool.datatypes.Versions` object will be
+    returned containing the different versions of this node.
 
-    Example handling a simple `$eval` statement:
+    i.e. instead of returning::
 
-    >>> node={"$eval" : 2 + 2}
-    >>> fn=partial(do_eval, locals=node)
-    >>> recursive_apply_dict(node, fn)
-    4
+        {"a":1, "b":Versions([1,2])}
 
-    If the data in the node contains `runtool.datatypes.Versions` objects,
-    or if they are generated by the `fn` during runtime `recursive_apply_dict`
-    merges these into a new `runtool.datatypes.Versions` object.
-
-    >>> fn = lambda x : x
-    >>> node = {
-    ...     'a': Versions(__root__=[1,2]),
-    ...     'b': Versions(__root__=[3,4])
-    ... }
-    >>> expected = Versions(__root__=[
-    ...     {'a': 1,'b':3},
-    ...     {'a': 1,'b':4},
-    ...     {'a': 2,'b':3},
-    ...     {'a': 2,'b':4}
-    ... ])
-    >>> recursive_apply_dict(node, fn) == expected
-    True
-
-    `runtool.datatypes.Versions` objects are for example generated during runtime
-    by the `do_each` function. Thus the code below results in the same output.
-
-    >>> fn = partial(do_each)
-    >>> node={
-    ... 'a': {'$each':[1,2]},
-    ... 'b': {'$each':[3,4]}
-    ... }
-    >>> expected = Versions(__root__=[
-    ...     {'a': 1,'b':3},
-    ...     {'a': 1,'b':4},
-    ...     {'a': 2,'b':3},
-    ...     {'a': 2,'b':4}
-    ... ])
-    >>> recursive_apply_dict(node, fn) == expected
-    True
+    this method would return::
+        Versions([{"a":1, "b":1}, {"a":1, "b":2}}
 
     """
     # basecase of recursion, if `fn` modifies the node, return the new node
@@ -122,38 +112,55 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
 
     # else merge children of type Versions into a new Versions object
     expanded_children = []
-    children = {}
+    new_node = {}
     for key in node:
         child = recursive_apply(node[key], fn)
         if isinstance(child, Versions):
+            # If the child is a Versions object, map the key to all its versions
+            # example:
+            # child = Versions([1,2]),
+            # key=['a']
+            #
+            # results in
+            #
+            # (('a':1), ('a':2))
             expanded_children.append(itertools.product([key], child))
         else:
-            children[key] = child
-    as_dicts = [dict(ver) for ver in itertools.product(*expanded_children)]
+            new_node[key] = child
 
-    if as_dicts == [{}]:
-        return children
+    if expanded_children:
+        # example:
+        # expanded_children = [(('a':1), ('a':2)), (('b':1), ('b':2))]
+        # new_node = {"c": 3}
+        #
+        # results in:
+        #
+        # Versions([
+        #   {'a':1, 'b':1, 'c':3},
+        #   {'a':1, 'b':2, 'c':3},
+        #   {'a':2, 'b':1, 'c':3},
+        #   {'a':3, 'b':2, 'c':3},
+        # ])
+        return Versions.parse_obj(
+            [
+                dict(version_of_node, **new_node)
+                for version_of_node in itertools.product(*expanded_children)
+            ]
+        )
 
-    for dct in as_dicts:
-        dct.update(children)
-    return Versions.parse_obj(as_dicts)
+    return new_node
 
 
 @recursive_apply.register
 def recursive_apply_list(node: list, fn: Callable) -> Any:
     """
-    Recurses on each element in the node, without applying the `fn`.
-    Merges any Versions objects present in the children.
+    Calls `recursive_apply` on each element in the node, without applying `fn`.
+    Calculates the cartesian product of any `runtool.datatypes.Versions` objects
+    in the nodes children. From this a new `runtool.datatypes.Versions`object is
+    generated representing the different variants that this node can take.
 
-    Example:
-
-    >>> node = [1, Versions(__root__=[2, 3]), 4, Versions(__root__=[5, 6])]
-    >>> fn = lambda x: "hello"
-    >>> expected = Versions(
-    ...     __root__=[[1, 2, 4, 5], [1, 2, 4, 6], [1, 3, 4, 5], [1, 3, 4, 6]]
-    ... )
-    >>> recursive_apply_list(node, fn) == expected
-    True
+    NOTE::
+        The indexes of the node are maintained throughout this process.
     """
     versions_in_children = []
     child_normal = [None] * len(node)  # maintans indexes
@@ -188,9 +195,10 @@ def apply_from(node: dict, data: dict) -> dict:
     Update the node with the data which the path in node['$from'] is pointing to.
     i.e.
 
-    >>> data = {"another_node": {"a_key": {"hello": "world"}}}
-    >>> node = {"$from": "another_node.a_key", "some_key": "some_value"}
-    >>> apply_from(node, data)
+    >>> apply_from(
+    ...     node = {"$from": "another_node.a_key", "some_key": "some_value"},
+    ...     data = {"another_node": {"a_key": {"hello": "world"}}}
+    ... )
     {'hello': 'world', 'some_key': 'some_value'}
 
     """
@@ -217,15 +225,16 @@ def apply_ref(node: dict, context: dict) -> Any:
     `context["target"]` thus the value which the node will be replaced with
     will be `1` when the nested references has been resolved.
 
-    >>> node = {"$ref": "some_node.0.some_val"}
-    >>> context = {
-    ...     "target": 1,
-    ...     "some_node": [
-    ...         {"some_val": {"$ref": "target"}},
-    ...         "ignored"
-    ...     ]
-    ... }
-    >>> apply_ref(node, context)
+    >>> apply_ref(
+    ...     node={"$ref": "some_node.0.some_val"},
+    ...     context = {
+    ...         "target": 1,
+    ...         "some_node": [
+    ...             {"some_val": {"$ref": "target"}},
+    ...             "ignored"
+    ...         ]
+    ...     }
+    ... )
     1
     """
     assert len(node) == 1, "$ref needs to be the only value"
@@ -271,9 +280,9 @@ def recurse_eval(path: str, data: dict, fn: Callable) -> Tuple[str, Any]:
     since `.split()` is not an item in `data`.
 
     >>> recurse_eval(
-    ...     "a.b.0.split(' ')",
-    ...     {"a": {"b": [{"$eval": "'hey ' * 2"}]}},
-    ...     do_eval
+    ...     path = "a.b.0.split(' ')",
+    ...     data = {"a": {"b": [{"$eval": "'hey ' * 2"}]}},
+    ...     fn = lambda node, _ : eval(node["$eval"]) if "$eval" in node else node
     ... )
     ('a.b.0', 'hey hey ')
     """
@@ -326,9 +335,7 @@ def apply_eval(node: dict, locals: dict) -> Any:
         $trial gets renamed to __trial__ here as this function is a
         preprocessing step to `apply_trial`.
 
-    >>> node = {"$eval": "$trial.algorithm.some_value * 2"}
-    >>> locals = {}
-    >>> apply_eval(node, locals)
+    >>> apply_eval({"$eval": "$trial.algorithm.some_value * 2"}, {})
     {'$eval': '__trial__.algorithm.some_value * 2'}
 
     """
@@ -540,17 +547,17 @@ def apply_transformations(data: dict) -> list:
 
     Returns the different variants of the `data` after transformations as a list.
 
-    >>> node ={
-    ...     "base": {"msg": "hi"},
-    ...     "a": {"$from": "base", "smth": {"$each": [{"$eval": "pow(7, 2)"}, 2]}},
-    ...     "b": [{"$ref": "a.msg"}],
-    ... }
-    >>> expected = [
-    ...     {"a": {"smth": 49.0, "msg": "hi"}, "base": {"msg": "hi"}, "b": ["hi"]},
-    ...     {"a": {"smth": 2, "msg": "hi"}, "base": {"msg": "hi"}, "b": ["hi"]},
-    ... ]
-    >>> apply_transformations(node) == expected
-    True
+    >>> result = apply_transformations(
+    ...    {
+    ...         "base": {"msg": "hi"},
+    ...         "a": {"$from": "base", "smth": {"$each": [{"$eval": "pow(7, 2)"}, 2]}},
+    ...         "b": [{"$ref": "a.msg"}],
+    ...     }
+    ... )
+    >>> for version in result:
+    ...     print(version)
+    {'a': {'smth': 49.0, 'msg': 'hi'}, 'base': {'msg': 'hi'}, 'b': ['hi']}
+    {'a': {'smth': 2, 'msg': 'hi'}, 'base': {'msg': 'hi'}, 'b': ['hi']}
     """
     data = recursive_apply(data, partial(do_from, context=data))
     data = recursive_apply(data, partial(do_eval, locals=data))
