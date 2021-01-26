@@ -274,8 +274,8 @@ def evaluate(text: str, locals: dict) -> Any:
     as well as the `math` package is available when evaluating the text.
 
     >>> evaluate(
-    ...     "len(uid) + pow(some_value, 2)",
-    ...     {"some_value": 2}
+    ...     text = "len(uid) + pow(some_value, 2)",
+    ...     locals = {"some_value": 2}
     ... )
     16.0
 

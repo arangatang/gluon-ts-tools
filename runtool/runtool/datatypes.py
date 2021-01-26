@@ -31,6 +31,9 @@ class Versions:
         if not isinstance(other, Versions):
             return False
 
+        if len(other) != len(self):
+            return False
+
         # enforce same ordering and equality of children
         for this_version, other_version in zip(self.__root__, other.__root__):
             if this_version != other_version:
