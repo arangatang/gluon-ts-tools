@@ -30,7 +30,7 @@ def recursive_apply(node, fn: Callable) -> Any:
     ...     Converts node to a version object or multiplies it by 2
     ...     '''
     ...     if "version" in node:
-    ...         return Versions.parse_obj(node["version"])
+    ...         return Versions(node["version"])
     ...     if "double" in node:
     ...         return 2 * node["double"]
     ...     return node
@@ -134,7 +134,7 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
         #   {'a':2, 'b':1, 'c':3},
         #   {'a':3, 'b':2, 'c':3},
         # ])
-        return Versions.parse_obj(
+        return Versions(
             [
                 dict(version_of_node, **new_node)
                 for version_of_node in itertools.product(*expanded_children)
@@ -180,7 +180,7 @@ def recursive_apply_list(node: list, fn: Callable) -> Any:
             new_data[index] = value
         new_versions.append(new_data)
 
-    return Versions.parse_obj(new_versions)
+    return Versions(new_versions)
 
 
 def apply_from(node: dict, data: dict) -> dict:
@@ -458,16 +458,16 @@ def apply_each(node: dict) -> Versions:
             each = new
         else:
             each = [None if item == "$None" else item for item in each]
-        return Versions.parse_obj(each)
+        return Versions(each)
     elif isinstance(each, dict):
         seperated_dicts = [{key, val} for key, val in each.items()]
         for a_dict in seperated_dicts:
             a_dict.update(node)
-        return Versions.parse_obj(seperated_dicts)
+        return Versions(seperated_dicts)
     elif isinstance(each, Versions):
         # when having a nested $each this will be triggered
         flattened = itertools.chain.from_iterable(each)
-        return Versions.parse_obj(list(flattened))
+        return Versions(list(flattened))
     else:
         print("Something went wrong when expanding $each")
         raise NotImplementedError
@@ -477,7 +477,7 @@ def apply_each(node: dict) -> Versions:
 def do_from(node, context):
     """
     If the node is a dict and has `"$from"` as a key calls
-    `runtool.json_transformer.apply_from` and returns the results.
+    `runtool.transformer.apply_from` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$from" in node:
@@ -488,7 +488,7 @@ def do_from(node, context):
 def do_ref(node, context):
     """
     If the node is a dict and has `"$ref"` as a key calls
-    `runtool.json_transformer.apply_ref` and returns the results.
+    `runtool.transformer.apply_ref` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$ref" in node:
@@ -499,7 +499,7 @@ def do_ref(node, context):
 def do_eval(node, locals):
     """
     If the node is a dict and has `"$eval"` as a key calls
-    `runtool.json_transformer.apply_eval` and returns the results.
+    `runtool.transformer.apply_eval` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$eval" in node:
@@ -510,7 +510,7 @@ def do_eval(node, locals):
 def do_trial(node, locals):
     """
     If the node is a dict and has `"$eval"` as a key calls
-    `runtool.json_transformer.apply_trial` and returns the results.
+    `runtool.transformer.apply_trial` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$eval" in node:
@@ -521,7 +521,7 @@ def do_trial(node, locals):
 def do_each(node):
     """
     If the node is a dict and has `"$each"` as a key calls
-    `runtool.json_transformer.apply_each` and returns the results.
+    `runtool.transformer.apply_each` and returns the results.
     Otherwise returns the node.
     """
     if isinstance(node, dict) and "$each" in node:

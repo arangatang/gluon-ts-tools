@@ -3,22 +3,19 @@ from typing import Any, List
 from pydantic import BaseModel
 
 
-class Versions(BaseModel):
+class Versions:
     """
     The `Versions` class is used to represent an object which can
-    take several different values.
+    take several different values. These different values are passed
+    as a list when initializing the Versions object.
 
-    There are two ways of instantiating the `Versions` object, both require
-    a list with the different values which the `Versions` should represent.
-
-    >>> Versions.parse_obj([1, 2, 3])
-    Versions([1, 2, 3])
-
-    >>> Versions(__root__=[1, 2, 3])
+    >>> Versions([1, 2, 3])
     Versions([1, 2, 3])
     """
 
-    __root__: List[Any]  # using __root__: breaks doctest for this file
+    def __init__(self, versions: list):
+        assert isinstance(versions, list)
+        self.__root__ = versions
 
     def __repr__(self):
         return f"Versions({self.__root__})"

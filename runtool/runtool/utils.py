@@ -6,10 +6,12 @@ def get_item_from_path(data: Union[dict, list], path: str) -> Any:
     Access dict or list using a path split by '.'
 
     Example:
-    >>> data = {
-    ...     "hello": [1, 2, 3, {"there": "world"}]
-    ... }
-    >>> get_item_from_path(data, "hello.3.there")
+    >>> get_item_from_path(
+    ...     {
+    ...         "hello": [1, 2, 3, {"there": "world"}]
+    ...     },
+    ...     "hello.3.there"
+    ... )
     'world'
     """
     for key in path.split("."):
