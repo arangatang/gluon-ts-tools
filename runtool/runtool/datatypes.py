@@ -29,6 +29,17 @@ class Versions:
     def __iter__(self):
         return iter(self.__root__)
 
+    def __eq__(self, other):
+        if not isinstance(other, Versions):
+            return False
+
+        # enforce same ordering and equality of children
+        for this_version, other_version in zip(self.__root__, other.__root__):
+            if this_version != other_version:
+                return False
+
+        return True
+
 
 class DotDict(dict):
     """
