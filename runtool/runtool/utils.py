@@ -13,6 +13,17 @@ def get_item_from_path(data: Union[dict, list], path: str) -> Any:
     ...     "hello.3.there"
     ... )
     'world'
+
+    Parameters
+    ----------
+    node
+        The data which should be accessed.
+    path
+        The path describing what data should be extracted from the node.
+    Returns
+    -------
+    Any
+        The value of `data` at the given `path`
     """
     for key in path.split("."):
         try:
@@ -38,6 +49,17 @@ def update_nested_dict(data: dict, to_update: dict) -> dict:
     >>> data.update(to_update)
     >>> print(data)
     {'root': {'smth': {'hello': 'world'}}}
+
+    Parameters
+    ----------
+    data
+        The base dictionary which should be updated.
+    to_update
+        The changes which should be added to the data.
+    Returns
+    -------
+    dict
+        The updated dictionary.
     """
     for key, value in to_update.items():
         if isinstance(data, dict):

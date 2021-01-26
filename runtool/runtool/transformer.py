@@ -81,6 +81,16 @@ def recursive_apply(node, fn: Callable) -> Any:
     {'my_list': [{'hello': 'there'}, {'a': 2}, {'b': 3}]}
     {'my_list': [{'hello': 'there'}, {'a': 2}, {'b': 4}]}
 
+    Parameters
+    ----------
+    node
+        The node which should be processed.
+    fn
+        The function which should be applied to the node.
+    Returns
+    -------
+    Any
+        Depends on how `fn` transforms the node.
     """
     return node
 
@@ -194,6 +204,16 @@ def apply_from(node: dict, data: dict) -> dict:
     ... )
     {'hello': 'world', 'some_key': 'some_value'}
 
+    Parameters
+    ----------
+    node
+        The node which should be processed.
+    data:
+        Data which can be referenced if $from is in node.
+    Returns
+    -------
+    Dict
+        the `node` updated with values from `data`
     """
     node = dict(**node)  # needed if $from reference another $from
     path = node.pop("$from")
@@ -229,6 +249,17 @@ def apply_ref(node: dict, context: dict) -> Any:
     ...     }
     ... )
     1
+
+    Parameters
+    ----------
+    node
+        The node which should be processed.
+    context
+        The data which can be referenced using $ref
+    Returns
+    -------
+    Any
+        The data which is referenced
     """
     assert len(node) == 1, "$ref needs to be the only value"
     data = get_item_from_path(context, node["$ref"])
@@ -247,6 +278,17 @@ def evaluate(text: str, locals: dict) -> Any:
     ...     {"some_value": 2}
     ... )
     16.0
+
+    Parameters
+    ----------
+    text
+        The text which should be evaluated
+    locals
+        The locals parameter to the `eval` function in the standard library.
+    Returns
+    -------
+    Any
+        The value after applying `eval` to the text.
     """
     uid = str(uuid4()).split("-")[-1]
     locals = dict(DotDict(locals))
@@ -278,6 +320,19 @@ def recurse_eval(path: str, data: dict, fn: Callable) -> Tuple[str, Any]:
     ...     fn = lambda node, _ : eval(node["$eval"]) if "$eval" in node else node
     ... )
     ('a.b.0', 'hey hey ')
+
+    Parameters
+    ----------
+    path
+        The path to fetch from in the data
+    data
+        Dictionary from which data should be fetched
+    fn
+        function to call with the fetched data as parameter
+    Returns
+    -------
+    Tuple[str, Any]
+        The path and the value after applying the `fn`
     """
     tmp = data
     current_path = []
@@ -331,6 +386,16 @@ def apply_eval(node: dict, locals: dict) -> Any:
     >>> apply_eval({"$eval": "$trial.algorithm.some_value * 2"}, {})
     {'$eval': '__trial__.algorithm.some_value * 2'}
 
+    Parameters
+    ----------
+    node
+        The node which should be processed.
+    locals:
+        The local variables available for when calling eval.
+    Returns
+    -------
+    Any
+        The transformed node.
     """
     assert len(node) == 1, "$eval needs to be only value"
     text = str(node["$eval"])
@@ -382,6 +447,17 @@ def apply_trial(node: dict, locals: dict) -> Any:
     ...     {"__trial__": {"something":[1,2,3]}}
     ... )
     3
+
+    Parameters
+    ----------
+    node
+        The node which should be processed.
+    locals:
+        The local variables available for when calling eval.
+    Returns
+    -------
+    Any
+        The transformed node.
     """
     assert len(node) == 1, "$eval needs to be only value"
     text = str(node["$eval"])
@@ -551,6 +627,15 @@ def apply_transformations(data: dict) -> list:
     ...     print(version)
     {'a': {'smth': 49.0, 'msg': 'hi'}, 'base': {'msg': 'hi'}, 'b': ['hi']}
     {'a': {'smth': 2, 'msg': 'hi'}, 'base': {'msg': 'hi'}, 'b': ['hi']}
+
+    Parameters
+    ----------
+    data
+        The dictionary which should be transformed
+    Returns
+    -------
+    list
+        the transformed `data` where each item is a version of the data.
     """
     data = recursive_apply(data, partial(do_from, context=data))
     data = recursive_apply(data, partial(do_eval, locals=data))
