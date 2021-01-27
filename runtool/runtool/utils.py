@@ -14,12 +14,6 @@ def get_item_from_path(data: Union[dict, list], path: str) -> Any:
     ... )
     'world'
 
-    Parameters
-    ----------
-    node
-        The data which should be accessed.
-    path
-        The path describing what data should be extracted from the node.
     Returns
     -------
     Any

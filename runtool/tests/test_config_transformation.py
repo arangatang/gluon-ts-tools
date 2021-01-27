@@ -1,10 +1,10 @@
 import pytest
-import runtool
 import yaml
+from runtool.transformer import apply_transformations
 
 
 def assert_config_equal(source, expected):
-    received = runtool.parse(yaml.safe_load(source))
+    received = apply_transformations(yaml.safe_load(source))
     assert received == yaml.safe_load(expected)
 
 
