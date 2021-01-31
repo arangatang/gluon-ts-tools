@@ -1,7 +1,13 @@
 from functools import partial
 
 from runtool.recurse_config import recursive_apply
-from runtool.transformations import do_each, do_eval, do_from, do_ref, do_trial
+from runtool.transformations import (
+    apply_eval,
+    apply_from,
+    apply_ref,
+    apply_trial,
+    apply_each,
+)
 from runtool.datatypes import Versions
 
 
@@ -9,10 +15,10 @@ def apply_transformations(data: dict) -> list:
     """
     Applies a chain of transformations converting nodes in `data` using
 
-    - `do_from`
-    - `do_eval`
-    - `do_each`
-    - `do_ref`
+    - `apply_from`
+    - `apply_eval`
+    - `apply_each`
+    - `apply_ref`
 
     Returns the different variants of the `data` after transformations as a list.
 
@@ -37,12 +43,13 @@ def apply_transformations(data: dict) -> list:
     list
         the transformed `data` where each item is a version of the data.
     """
-    data = recursive_apply(data, partial(do_from, context=data))
-    data = recursive_apply(data, partial(do_eval, locals=data))
-    data = recursive_apply(data, do_each)
+    data = recursive_apply(data, partial(apply_from, data=data))
+    data = recursive_apply(data, partial(apply_eval, locals=data))
+    data = recursive_apply(data, apply_each)
 
     data = list(data) if isinstance(data, Versions) else [data]
     data = [
-        recursive_apply(item, partial(do_ref, context=item)) for item in data
+        recursive_apply(item, partial(apply_ref, context=item))
+        for item in data
     ]
     return data

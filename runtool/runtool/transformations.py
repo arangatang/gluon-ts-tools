@@ -33,10 +33,13 @@ def apply_from(node: dict, data: dict) -> dict:
     Dict
         the `node` updated with values from `data`
     """
+    if not (isinstance(node, dict) and "$from" in node):
+        return node
+
     node = dict(**node)  # needed if $from reference another $from
     path = node.pop("$from")
     from_value = get_item_from_path(data, path)
-    from_value = recursive_apply(from_value, partial(do_from, context=data))
+    from_value = recursive_apply(from_value, partial(apply_from, data=data))
 
     assert isinstance(
         from_value, dict
@@ -79,9 +82,12 @@ def apply_ref(node: dict, context: dict) -> Any:
     Any
         The data which is referenced
     """
+    if not (isinstance(node, dict) and "$ref" in node):
+        return node
+
     assert len(node) == 1, "$ref needs to be the only value"
     data = get_item_from_path(context, node["$ref"])
-    return recursive_apply(data, partial(do_ref, context=context))
+    return recursive_apply(data, partial(apply_ref, context=context))
 
 
 def evaluate(text: str, locals: dict) -> Any:
@@ -117,7 +123,7 @@ def evaluate(text: str, locals: dict) -> Any:
         locals,
     )
     if isinstance(ret, dict) and "$eval" in ret:
-        return do_eval(ret, locals)
+        return apply_eval(ret, locals)
     return ret
 
 
@@ -215,6 +221,9 @@ def apply_eval(node: dict, locals: dict) -> Any:
     Any
         The transformed node.
     """
+    if not (isinstance(node, dict) and "$eval" in node):
+        return node
+
     assert len(node) == 1, "$eval needs to be only value"
     text = str(node["$eval"])
     text = text.replace("$trial", "__trial__")
@@ -235,7 +244,7 @@ def apply_eval(node: dict, locals: dict) -> Any:
     # replace any matched substrings of the text with whatever the
     # substrings pointed to in the locals parameter
     for match in re.finditer(regex, text, flags=re.VERBOSE):
-        path, value = recurse_eval(match[0].lstrip("$."), locals, do_eval)
+        path, value = recurse_eval(match[0].lstrip("$."), locals, apply_eval)
         path = f"$.{path}"
         if isinstance(value, dict) and "$eval" in value:
             text = text.replace(path, f"({value['$eval']})")
@@ -277,6 +286,9 @@ def apply_trial(node: dict, locals: dict) -> Any:
     Any
         The transformed node.
     """
+    if not (isinstance(node, dict) and "$eval" in node):
+        return node
+
     assert len(node) == 1, "$eval needs to be only value"
     text = str(node["$eval"])
 
@@ -293,7 +305,7 @@ def apply_trial(node: dict, locals: dict) -> Any:
 
     # find longest working path for each match in locals
     for match in re.finditer(regex, text, flags=re.VERBOSE):
-        substring, value = recurse_eval(match[0], locals, do_trial)
+        substring, value = recurse_eval(match[0], locals, apply_trial)
 
         if isinstance(value, dict) and "$eval" in value:
             raise TypeError("$eval: $trial cannot resolve to value")
@@ -335,6 +347,9 @@ def apply_each(node: dict) -> Versions:
     runtool.datatypes.Versions
         The versions object representing the different values of the node.
     """
+    if not (isinstance(node, dict) and "$each" in node):
+        return node
+
     each = node.pop("$each")
     if isinstance(each, list):
         if all(isinstance(item, dict) or item == "$None" for item in each):
@@ -349,59 +364,3 @@ def apply_each(node: dict) -> Versions:
         else:
             each = [None if item == "$None" else item for item in each]
     return Versions(each)
-
-
-# DO: find correct place within the data to do the transformation
-def do_from(node, context):
-    """
-    If the node is a dict and has `"$from"` as a key calls
-    `runtool.transformer.apply_from` and returns the results.
-    Otherwise returns the node.
-    """
-    if isinstance(node, dict) and "$from" in node:
-        return apply_from(node, context)
-    return node
-
-
-def do_ref(node, context):
-    """
-    If the node is a dict and has `"$ref"` as a key calls
-    `runtool.transformer.apply_ref` and returns the results.
-    Otherwise returns the node.
-    """
-    if isinstance(node, dict) and "$ref" in node:
-        return apply_ref(node, context)
-    return node
-
-
-def do_eval(node, locals):
-    """
-    If the node is a dict and has `"$eval"` as a key calls
-    `runtool.transformer.apply_eval` and returns the results.
-    Otherwise returns the node.
-    """
-    if isinstance(node, dict) and "$eval" in node:
-        return apply_eval(node, locals)
-    return node
-
-
-def do_trial(node, locals):
-    """
-    If the node is a dict and has `"$eval"` as a key calls
-    `runtool.transformer.apply_trial` and returns the results.
-    Otherwise returns the node.
-    """
-    if isinstance(node, dict) and "$eval" in node:
-        return apply_trial(node, locals)
-    return node
-
-
-def do_each(node):
-    """
-    If the node is a dict and has `"$each"` as a key calls
-    `runtool.transformer.apply_each` and returns the results.
-    Otherwise returns the node.
-    """
-    if isinstance(node, dict) and "$each" in node:
-        return apply_each(node)
-    return node
