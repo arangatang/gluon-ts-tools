@@ -92,8 +92,8 @@ def recursive_apply(node, fn: Callable) -> Any:
 @recursive_apply.register
 def recursive_apply_dict(node: dict, fn: Callable) -> Any:
     """
-    Applies `fn` to each element in the dict, if `fn` changes the node,
-    the changes should be returned. If the `fn` foes not change the node,
+    Applies `fn` to the node, if `fn` changes the node,
+    the changes should be returned. If the `fn` does not change the node,
     it calls `recursive_apply` on the children of the node.
 
     In case the recursion on the children results in one or more
@@ -102,16 +102,12 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
     returned containing the different versions of this node.
 
     """
-    # basecase of recursion, if `fn` modifies the node, return the new node
-    new_node = fn(node)
-    if new_node is not node:
-        return new_node
 
     # else merge children of type Versions into a new Versions object
     expanded_children = []
     new_node = {}
-    for key in node:
-        child = recursive_apply(node[key], fn)
+    for key, value in node.items():
+        child = recursive_apply(value, fn)
         if isinstance(child, Versions):
             # If the child is a Versions object, map the key to all its versions
             # example:
@@ -124,7 +120,6 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
             expanded_children.append(itertools.product([key], child))
         else:
             new_node[key] = child
-
     if expanded_children:
         # example:
         # expanded_children = [(('a':1), ('a':2)), (('b':1), ('b':2))]
@@ -132,20 +127,32 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
         #
         # results in:
         #
-        # Versions([
+        # [
         #   {'a':1, 'b':1, 'c':3},
         #   {'a':1, 'b':2, 'c':3},
         #   {'a':2, 'b':1, 'c':3},
         #   {'a':3, 'b':2, 'c':3},
-        # ])
-        return Versions(
-            [
+        # ]
+        new_node = [
+            fn(
                 dict(version_of_node, **new_node)
-                for version_of_node in itertools.product(*expanded_children)
-            ]
-        )
+            )  # apply fn to the new version of the node
+            for version_of_node in itertools.product(*expanded_children)
+        ]
 
-    return new_node
+        # if the current node generated Versions object, these
+        # need to be flattened as well.
+        # i.e.
+        #
+        # new_node = [Versions([1,2]), Versions([3,4])]
+        #
+        # results in
+        #
+        # Versions([[1,3], [1,4], [2,3], [2,4]])
+        if all(isinstance(val, Versions) for val in new_node):
+            return Versions(list(*itertools.product(*new_node)))
+        return Versions(new_node)
+    return fn(new_node)
 
 
 @recursive_apply.register
@@ -161,8 +168,8 @@ def recursive_apply_list(node: list, fn: Callable) -> Any:
     """
     versions_in_children = []
     child_normal = [None] * len(node)  # maintans indexes
-    for index in range(len(node)):
-        child = recursive_apply(node[index], fn)
+    for index, value in enumerate(node):
+        child = recursive_apply(value, fn)
         if isinstance(child, Versions):
             # child = Versions([1,2])
             # =>

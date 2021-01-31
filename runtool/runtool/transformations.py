@@ -335,13 +335,9 @@ def apply_each(node: dict) -> Versions:
     runtool.datatypes.Versions
         The versions object representing the different values of the node.
     """
-
-    each = recursive_apply(node.pop("$each"), do_each)
+    each = node.pop("$each")
     if isinstance(each, list):
-        # check if all are dicts or has the $None tag
-        if all(
-            map(lambda item: isinstance(item, dict) or item == "$None", each)
-        ):
+        if all(isinstance(item, dict) or item == "$None" for item in each):
             new = []
             for item in each:
                 if item == "$None":
@@ -352,19 +348,7 @@ def apply_each(node: dict) -> Versions:
             each = new
         else:
             each = [None if item == "$None" else item for item in each]
-        return Versions(each)
-    elif isinstance(each, dict):
-        seperated_dicts = [{key, val} for key, val in each.items()]
-        for a_dict in seperated_dicts:
-            a_dict.update(node)
-        return Versions(seperated_dicts)
-    elif isinstance(each, Versions):
-        # when having a nested $each this will be triggered
-        flattened = itertools.chain.from_iterable(each)
-        return Versions(list(flattened))
-    else:
-        print("Something went wrong when expanding $each")
-        raise NotImplementedError
+    return Versions(each)
 
 
 # DO: find correct place within the data to do the transformation
