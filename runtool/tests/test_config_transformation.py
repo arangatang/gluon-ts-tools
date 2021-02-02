@@ -379,6 +379,68 @@ def test_each_skip():
     )
 
 
+def test_each_dict():
+    assert_config_equal(
+        source="""
+        foo:
+            $each: 
+                -
+                    x: y
+        """,
+        expected="""
+        - 
+            foo:
+                x: y
+        """,
+    )
+
+
+def test_each_dict_overwrite():
+    with pytest.raises(TypeError):
+        assert_config_equal(
+            source="""
+            foo:
+                a: b
+                $each: [1, 2]
+            
+            """,
+            expected="",
+        )
+
+
+def test_each_list_merge():
+    assert_config_equal(
+        source="""
+        foo:
+            - 1
+            - $each:
+                - 2
+                - 3
+        """,
+        expected="""
+        - foo: [1, 2]
+        - foo: [1, 3]
+        """,
+    )
+
+
+def test_each_in_list():
+    assert_config_equal(
+        source="""
+        foo:
+            - $each:
+                - 1
+                - 2
+                - 3
+        """,
+        expected="""
+        - foo: [1]
+        - foo: [2]
+        - foo: [3]
+        """,
+    )
+
+
 def test_eval():
     assert_config_equal(
         source="""
@@ -551,5 +613,55 @@ def test_eval_indexing_recursive():
                     f:
                         - 10
             f: 10
+        """,
+    )
+
+
+def test_simple_integration():
+    assert_config_equal(
+        source="""
+        my_ds:
+            path:
+                train: s3://runtool/datasets/constant/train/data.json
+                test: s3://runtool/datasets/constant/test/data.json
+
+        my_algo:
+            image: 012345678901.dkr.ecr.eu-west-1.amazonaws.com/gluonts/cpu:latest # image with gluon-ts installed
+            instance: ml.m5.xlarge
+            hyperparameters:
+                prediction_length: 7
+                freq: D
+
+        algorithms:
+            - $ref: my_algo
+        datasets:
+            - $ref: my_ds
+        """,
+        expected="""
+        -
+            my_ds:
+                path:
+                    train: s3://runtool/datasets/constant/train/data.json
+                    test: s3://runtool/datasets/constant/test/data.json
+
+            my_algo:
+                image: 012345678901.dkr.ecr.eu-west-1.amazonaws.com/gluonts/cpu:latest # image with gluon-ts installed
+                instance: ml.m5.xlarge
+                hyperparameters:
+                    prediction_length: 7
+                    freq: D
+
+            algorithms:
+                - 
+                    image: 012345678901.dkr.ecr.eu-west-1.amazonaws.com/gluonts/cpu:latest # image with gluon-ts installed
+                    instance: ml.m5.xlarge
+                    hyperparameters:
+                        prediction_length: 7
+                        freq: D
+            datasets:
+                - 
+                    path:
+                        train: s3://runtool/datasets/constant/train/data.json
+                        test: s3://runtool/datasets/constant/test/data.json
         """,
     )

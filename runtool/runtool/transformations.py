@@ -322,20 +322,40 @@ def apply_each(node: dict) -> Versions:
     If `$each` is in the node, it means that the node can become
     several different values.
 
-    Example, a node which can take the values `1` or `2` or `3`:
+    NOTE::
+        nodes which can take multiple values are represented as
+        `runtool.datatypes.Versions` objects. Refer to their documentation
+        for further information.
+
+    Example, a node which can take the values `1` or `2` or `3` can be generated
+    as follows:
 
     >>> apply_each({"$each":[1,2,3]})
     Versions([1, 2, 3])
 
-    Below is an example where `$each` is used to generate two versions
-    of the node:
+    If dictionaries are passed to $each, these will be updated with the
+    value of the passed `node` before a Versions object is generated.
+
+    >>> apply_each({"a": 1, "$each": [{"b": 2}]})
+    Versions([{'b': 2, 'a': 1}])
+
+    It is possible to have an unaltered version of the parent node by
+    inserting $None into the values of $each. In the example below,
+    apply_each generates two versions of the node, one which is unaltered
+    and one which is merged with another dict.
+
+    >>> apply_each({"a": 1, "$each": ["$None"]})
+    Versions([{'a': 1}])
+
+    Below is a more complicated example combining the two examples above:
+
     >>> apply_each(
     ...     {
-    ...         "c": "dummy",
-    ...         "$each": ["$None", {"a": 150, "b": 64}]
+    ...         "a": 1,
+    ...         "$each": ["$None", {"b": 2, "c": 3}]
     ...     }
     ... )
-    Versions([{'c': 'dummy'}, {'a': 150, 'b': 64, 'c': 'dummy'}])
+    Versions([{'a': 1}, {'b': 2, 'c': 3, 'a': 1}])
 
     Parameters
     ----------
@@ -351,16 +371,39 @@ def apply_each(node: dict) -> Versions:
         return node
 
     each = node.pop("$each")
-    if isinstance(each, list):
-        if all(isinstance(item, dict) or item == "$None" for item in each):
-            new = []
-            for item in each:
-                if item == "$None":
-                    new.append(node)
-                else:
-                    item.update(node)
-                    new.append(item)
-            each = new
+    if not isinstance(each, list):
+        raise TypeError(
+            f"$each requires a list, not an object of type {type(each)}"
+        )
+
+    # Generate versions of the current node
+    new = []
+    for item in each:
+        if item == "$None":
+            # return unaltered node
+            # node = {"a": 1, "$each": ["$None"]}
+            # ==>
+            # {"a": 1}
+            new.append(node)
+        elif isinstance(item, dict):
+            # merge node with value in $each
+            # node = {"a": 1, "$each": [{"b: 2"}]}
+            # ==>
+            # {"a": 1, "b": 2}
+            item.update(node)
+            new.append(item)
         else:
-            each = [None if item == "$None" else item for item in each]
-    return Versions(each)
+            # any other value overwrites the node if node is
+            # otherwise empty.
+            # node = {"$each": [2]}
+            # ==>
+            # 2
+            if node:
+                node["$each"] = each
+                raise TypeError(
+                    "Using $each in a non-empty node is only supported"
+                    " when using dictionaries or with the $None operator."
+                    f" The error occured in:\n{node}"
+                )
+            new.append(item)
+    return Versions(new)
