@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import yaml
 from runtool.transformer import apply_transformations
@@ -6,6 +8,19 @@ from runtool.transformer import apply_transformations
 def assert_config_equal(source, expected):
     received = apply_transformations(yaml.safe_load(source))
     assert received == yaml.safe_load(expected)
+
+
+def load(testname):
+    path = Path(__file__).parent / "test_data" / testname
+
+    expected_path = path / "expected.yml"
+    source_path = path / "source.yml"
+
+    with source_path.open() as source, expected_path.open() as expected:
+        return {
+            "source": source.read(),
+            "expected": expected.read(),
+        }
 
 
 def test_from_simple():
@@ -617,51 +632,13 @@ def test_eval_indexing_recursive():
     )
 
 
-def test_simple_integration():
-    assert_config_equal(
-        source="""
-        my_ds:
-            path:
-                train: s3://runtool/datasets/constant/train/data.json
-                test: s3://runtool/datasets/constant/test/data.json
+def test_simple_example():
+    assert_config_equal(**load("simple_example"))
 
-        my_algo:
-            image: 012345678901.dkr.ecr.eu-west-1.amazonaws.com/gluonts/cpu:latest # image with gluon-ts installed
-            instance: ml.m5.xlarge
-            hyperparameters:
-                prediction_length: 7
-                freq: D
 
-        algorithms:
-            - $ref: my_algo
-        datasets:
-            - $ref: my_ds
-        """,
-        expected="""
-        -
-            my_ds:
-                path:
-                    train: s3://runtool/datasets/constant/train/data.json
-                    test: s3://runtool/datasets/constant/test/data.json
+def test_large_example():
+    assert_config_equal(**load("large_example"))
 
-            my_algo:
-                image: 012345678901.dkr.ecr.eu-west-1.amazonaws.com/gluonts/cpu:latest # image with gluon-ts installed
-                instance: ml.m5.xlarge
-                hyperparameters:
-                    prediction_length: 7
-                    freq: D
 
-            algorithms:
-                - 
-                    image: 012345678901.dkr.ecr.eu-west-1.amazonaws.com/gluonts/cpu:latest # image with gluon-ts installed
-                    instance: ml.m5.xlarge
-                    hyperparameters:
-                        prediction_length: 7
-                        freq: D
-            datasets:
-                - 
-                    path:
-                        train: s3://runtool/datasets/constant/train/data.json
-                        test: s3://runtool/datasets/constant/test/data.json
-        """,
-    )
+def test_complex_example():
+    assert_config_equal(**load("complex_example"))
