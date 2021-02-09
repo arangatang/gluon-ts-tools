@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Union, Dict
 
 
 class Versions:
@@ -100,9 +100,25 @@ class DotDict(dict):
         return {key: convert(value) for key, value in self.items()}
 
 
-class Node(DotDict):
+class Node(dict):
     def __repr__(self):
         return f"{type(self).__name__}({self.items()})"
+
+    def __mul__(self, other):
+        if isinstance(other, Node):
+            return Experiments([Experiment(self, other)])
+        elif isinstance(other, ListNode):
+            return Experiments([Experiment(self, item) for item in other])
+
+        raise TypeError(f"Unable to multiply {type(self)} with {type(other)}")
+
+    def __add__(self, other):
+        if isinstance(other, type(self)):
+            return self.__add_result_class__([self, other])
+        elif isinstance(other, self.__add_result_class__):
+            return self.__add_result_class__([self]) + other
+
+        raise TypeError
 
 
 class ListNode(list):
@@ -115,8 +131,8 @@ class ListNode(list):
             return type(self)(list(self) + list(other))
         elif isinstance(other, self.allowed_children):
             return type(self)(list(self) + [other])
-        else:
-            raise TypeError
+
+        raise TypeError
 
     def __mul__(self, other):
         if isinstance(other, self.multiplies_with):
@@ -135,31 +151,20 @@ class ListNode(list):
 
 
 class Algorithm(Node):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__add_result_class__ = Algorithms
+
     @classmethod
-    def verify(cls, data):
-        try:
-            assert "image" in data
-            assert "instance" in data
-            assert isinstance(data.get("hyperparameters", {}), dict)
-            return True
-        except AssertionError:
-            return False
-
-    def __mul__(self, other):
-        if type(other) is Dataset:
-            return Experiments([Experiment(self, other)])
-        elif type(other) is Datasets:
-            return Experiments([Experiment(self, ds) for ds in other])
-        else:
-            raise TypeError(f"Unable to multiply Algorithm with {type(other)}")
-
-    def __add__(self, other):
-        if isinstance(other, Algorithm):
-            return Algorithms([self, other])
-        elif isinstance(other, Algorithms):
-            return Algorithms([self]) + other
-        else:
-            raise TypeError
+    def verify(cls, data: dict) -> bool:
+        return all(
+            (
+                isinstance(data, dict),
+                isinstance(data.get("image", None), str),
+                isinstance(data.get("instance", None), str),
+                isinstance(data.get("hyperparameters", {}), dict),
+            )
+        )
 
 
 class Algorithms(ListNode):
@@ -167,69 +172,46 @@ class Algorithms(ListNode):
         if not self.verify(data):
             raise TypeError
 
-        for algo in data:
-            self.append(Algorithm(algo))
-
+        self.extend(Algorithm(algo) for algo in data)
         self.allowed_children = Algorithm
         self.multiplies_with = (Dataset, Datasets)
 
     @classmethod
     def verify(cls, data):
-        for item in data:
-            if not Algorithm.verify(item):
-                return False
-        return True
+        return all(map(Algorithm.verify, data))
 
 
 class Dataset(Node):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__add_result_class__ = Datasets
+
     @classmethod
-    def verify(cls, data):
-        try:
-            assert data["path"]
-            assert isinstance(data["path"], dict)
-            assert isinstance(data.get("meta", {}), dict)
-            return True
-        except Exception:
-            return False
-
-    def __mul__(self, other):
-        if isinstance(other, Algorithm):
-            return Experiments([Experiment(other, self)])
-        elif isinstance(other, Algorithms):
-            return Experiments([Experiment(algo, self) for algo in other])
-        else:
-            raise TypeError
-
-    def __add__(self, other):
-        if type(other) is Dataset:
-            return Datasets([self, other])
-        elif type(other) is Datasets:
-            return Datasets([self]) + other
-        else:
-            raise TypeError
+    def verify(cls, data: dict) -> bool:
+        return all(
+            (
+                isinstance(data, dict),
+                isinstance(data.get("path", None), dict),
+                isinstance(data.get("meta", {}), dict),
+            )
+        )
 
 
 class Datasets(ListNode):
-    allowed_children = Dataset
-
     def __init__(self, data):
         if not self.verify(data):
             raise TypeError
-        for ds in data:
-            self.append(Dataset(ds))
 
+        self.extend(Dataset(ds) for ds in data)
         self.allowed_children = Dataset
         self.multiplies_with = (Algorithm, Algorithms)
 
     @classmethod
     def verify(cls, data):
-        for item in data:
-            if not Dataset.verify(item):
-                return False
-        return True
+        return all(map(Dataset.verify, data))
 
 
-class Experiment(Node):
+class Experiment(dict):
     def __init__(self, node_1, node_2):
         def extract(desired_type):
             if isinstance(node_1, desired_type):
@@ -240,20 +222,23 @@ class Experiment(Node):
 
         self["algorithm"] = extract(Algorithm)
         self["dataset"] = extract(Dataset)
-        assert self["dataset"] and self["algorithm"]
+        if not (self["dataset"] and self["algorithm"]):
+            raise TypeError(
+                "An Experiment requires a Dataset and an Algorithm, got:"
+                f"{type(node_1)} and {type(node_2)}"
+            )
 
     @classmethod
     def verify(cls, data):
-        try:
-            assert Algorithm.verify(data["algorithm"])
-            assert Dataset.verify(data["dataset"])
-            return True
-        except Exception:
-            return False
+        return Algorithm.verify(data["algorithm"]) and Dataset.verify(
+            data["dataset"]
+        )
+
+    __mul__ = None  # An Experiment cannot be multiplied
 
 
 class Experiments(ListNode):
-    def __init__(self, experiments):
+    def __init__(self, experiments: Union[List[dict], List[Experiment]]):
         if not self.verify(experiments):
             raise TypeError
 
@@ -263,12 +248,9 @@ class Experiments(ListNode):
             self.append(item)
 
         self.allowed_children = Experiment
-        self.multiplies_with = None
 
     @classmethod
-    def verify(cls, data):
-        for item in data:
-            if not Experiment.verify(item):
-                print(f"expected an Experiment, found {type(item)}")
-                return False
-        return True
+    def verify(cls, data: dict) -> bool:
+        return all(map(Experiment.verify, data))
+
+    __mul__ = None  # Several Experiments cannot be multiplied
