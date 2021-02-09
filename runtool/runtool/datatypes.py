@@ -157,13 +157,11 @@ class Algorithm(Node):
 
     @classmethod
     def verify(cls, data: dict) -> bool:
-        return all(
-            (
-                isinstance(data, dict),
-                isinstance(data.get("image", None), str),
-                isinstance(data.get("instance", None), str),
-                isinstance(data.get("hyperparameters", {}), dict),
-            )
+        return (
+            isinstance(data, dict)
+            and isinstance(data.get("image", None), str)
+            and isinstance(data.get("instance", None), str)
+            and isinstance(data.get("hyperparameters", {}), dict)
         )
 
 
@@ -188,12 +186,10 @@ class Dataset(Node):
 
     @classmethod
     def verify(cls, data: dict) -> bool:
-        return all(
-            (
-                isinstance(data, dict),
-                isinstance(data.get("path", None), dict),
-                isinstance(data.get("meta", {}), dict),
-            )
+        return (
+            isinstance(data, dict)
+            and isinstance(data.get("path", None), dict)
+            and isinstance(data.get("meta", {}), dict)
         )
 
 
@@ -222,6 +218,7 @@ class Experiment(dict):
 
         self["algorithm"] = extract(Algorithm)
         self["dataset"] = extract(Dataset)
+
         if not (self["dataset"] and self["algorithm"]):
             raise TypeError(
                 "An Experiment requires a Dataset and an Algorithm, got:"
@@ -242,10 +239,12 @@ class Experiments(ListNode):
         if not self.verify(experiments):
             raise TypeError
 
-        for item in experiments:
-            if not isinstance(item, Experiment):
-                item = Experiment(item["algorithm"], item["dataset"])
-            self.append(item)
+        self.extend(
+            item
+            if isinstance(item, Experiment)
+            else Experiment(item["algorithm"], item["dataset"])
+            for item in experiments
+        )
 
         self.allowed_children = Experiment
 
