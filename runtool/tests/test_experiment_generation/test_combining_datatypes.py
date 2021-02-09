@@ -41,10 +41,34 @@ def test_algorithm_mul_algorithms():
         ALGORITHM * Algorithms([ALGORITHM])
 
 
+def test_dataset_mul_dataset():
+    with pytest.raises(TypeError):
+        DATASET * DATASET
+
+
+def test_dataset_mul_datasets():
+    with pytest.raises(TypeError):
+        DATASET * Datasets([DATASET])
+
+
 def test_algorithm_mul_dataset():
-    assert ALGORITHM * DATASET == EXPERIMENT
-    assert DATASET * ALGORITHM == EXPERIMENT
+    assert ALGORITHM * DATASET == Experiments([EXPERIMENT])
+    assert DATASET * ALGORITHM == Experiments([EXPERIMENT])
 
 
 def test_algorithm_mul_datasets():
     assert ALGORITHM * Datasets([DATASET]) == Experiments([EXPERIMENT])
+    assert Datasets([DATASET]) * ALGORITHM == Experiments([EXPERIMENT])
+
+
+def test_algorithm_plus_algorithm():
+    assert ALGORITHM + ALGORITHM == Algorithms([ALGORITHM, ALGORITHM])
+
+
+def test_algorithm_plus_algorithms():
+    assert ALGORITHM + Algorithms([ALGORITHM, ALGORITHM]) == Algorithms(
+        [ALGORITHM, ALGORITHM, ALGORITHM]
+    )
+    assert Algorithms([ALGORITHM, ALGORITHM]) + ALGORITHM == Algorithms(
+        [ALGORITHM, ALGORITHM, ALGORITHM]
+    )

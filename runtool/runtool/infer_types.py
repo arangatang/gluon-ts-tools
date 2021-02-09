@@ -5,7 +5,6 @@ from runtool.datatypes import (
     Algorithms,
     Dataset,
     Datasets,
-    Generics,
     Versions,
 )
 
@@ -13,38 +12,37 @@ from runtool.datatypes import (
 @singledispatch
 def infer_type(node: Any) -> Any:
     """
-    Base case, of single dispatch converting nodes in JSON
-    structure to Algorithms, Datasets or Generics
+    infer_type converts a node into one
+    of the following objects if possible;
+    - Algorithm
+    - Dataset
+    - Algorithms
+    - Datasets
+
+    structure to Algorithms, Datasets or Generics depending on the
+    contents of each node.
     """
     return node
 
 
 @infer_type.register
-def infer_type_list(node: list) -> Union[Algorithms, Datasets, Generics, Any]:
-    if not node:
-        return Generics(node)
-    elif Algorithms.verify(node):
+def infer_type_list(node: list) -> Union[Algorithms, Datasets, Any]:
+    if Algorithms.verify(node):
         return Algorithms(node)
     elif Datasets.verify(node):
         return Datasets(node)
     else:
-        try:
-            return Generics(node)
-        except:
-            return node
+        return node
 
 
 @infer_type.register
-def infer_type_dict(node: dict) -> Union[Algorithm, Dataset, Generics, Any]:
+def infer_type_dict(node: dict) -> Union[Algorithm, Dataset, Any]:
     if Algorithm.verify(node):
         return Algorithm(node)
     elif Dataset.verify(node):
         return Dataset(node)
     else:
-        try:
-            return Generics(node)
-        except:
-            return node
+        return node
 
 
 @singledispatch

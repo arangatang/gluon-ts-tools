@@ -104,18 +104,34 @@ class Node(DotDict):
     def __repr__(self):
         return f"{type(self).__name__}({self.items()})"
 
-    def __hash__(self):
-        return hash(str(self))
-
 
 class ListNode(list):
     def __repr__(self):
         child_names = ", ".join([str(child) for child in self])
-
         return f"{type(self).__name__}({child_names})"
 
-    def to_base(self):
-        return [item.to_base() for item in self]
+    def __add__(self, other):
+        if isinstance(other, type(self)):
+            return type(self)(list(self) + list(other))
+        elif isinstance(other, self.allowed_children):
+            return type(self)(list(self) + [other])
+        else:
+            raise TypeError
+
+    def __mul__(self, other):
+        if isinstance(other, self.multiplies_with):
+            if isinstance(other, ListNode):
+                return Experiments(
+                    [
+                        Experiment(node_1, node_2)
+                        for node_1 in self
+                        for node_2 in other
+                    ]
+                )
+            elif isinstance(other, Node):
+                return Experiments([Experiment(item, other) for item in self])
+
+        raise TypeError
 
 
 class Algorithm(Node):
@@ -124,11 +140,9 @@ class Algorithm(Node):
         try:
             assert "image" in data
             assert "instance" in data
-
-            if "hyperparameters" in data:
-                assert isinstance(data["hyperparameters"], dict)
+            assert isinstance(data.get("hyperparameters", {}), dict)
             return True
-        except Exception:
+        except AssertionError:
             return False
 
     def __mul__(self, other):
@@ -136,19 +150,13 @@ class Algorithm(Node):
             return Experiments([Experiment(self, other)])
         elif type(other) is Datasets:
             return Experiments([Experiment(self, ds) for ds in other])
-        elif type(other) is Versions:
-            if isinstance(other[0], Datasets):
-                return self * other.flatten()
-            elif isinstance(other[0], Dataset):
-                return self * Datasets(other.flatten())
-            return other * self
         else:
             raise TypeError(f"Unable to multiply Algorithm with {type(other)}")
 
     def __add__(self, other):
-        if type(other) is Algorithm:
+        if isinstance(other, Algorithm):
             return Algorithms([self, other])
-        elif type(other) is Algorithms:
+        elif isinstance(other, Algorithms):
             return Algorithms([self]) + other
         else:
             raise TypeError
@@ -162,43 +170,15 @@ class Algorithms(ListNode):
         for algo in data:
             self.append(Algorithm(algo))
 
+        self.allowed_children = Algorithm
+        self.multiplies_with = (Dataset, Datasets)
+
     @classmethod
     def verify(cls, data):
         for item in data:
             if not Algorithm.verify(item):
                 return False
         return True
-
-    def __add__(self, other):
-        if type(other) is Algorithms:
-            return Algorithms(self + other)
-        elif type(other) is Algorithm:
-            return Algorithms(self + [other])
-        else:
-            raise TypeError
-
-    def __mul__(self, other):
-        if type(other) is Datasets:
-            return Experiments(
-                [
-                    Experiment(algorithm=algo, dataset=ds)
-                    for algo in self
-                    for ds in other
-                ]
-            )
-        elif type(other) is Dataset:
-            return Experiments(
-                [Experiment(algorithm=algo, dataset=other) for algo in self]
-            )
-        elif type(other) is Versions:
-            if isinstance(other[0], Datasets):
-                return self * other.flatten()
-            elif isinstance(other[0], Dataset):
-                return self * Datasets(other.flatten())
-
-            return other * self
-        else:
-            raise TypeError
 
 
 class Dataset(Node):
@@ -207,25 +187,16 @@ class Dataset(Node):
         try:
             assert data["path"]
             assert isinstance(data["path"], dict)
-            if "meta" in data:
-                assert isinstance(data["meta"], dict)
+            assert isinstance(data.get("meta", {}), dict)
             return True
         except Exception:
             return False
 
     def __mul__(self, other):
-        if type(other) is Algorithm:
-            return Experiments([Experiment(algorithm=other, dataset=self)])
-        elif type(other) is Algorithms:
-            return Experiments(
-                [Experiment(algorithm=algo, dataset=self) for algo in other]
-            )
-        elif type(other) is Versions:
-            if isinstance(other[0], Algorithms):
-                return self * other.flatten()
-            elif isinstance(other[0], Algorithm):
-                return self * Algorithms(other.flatten())
-            return other * self
+        if isinstance(other, Algorithm):
+            return Experiments([Experiment(other, self)])
+        elif isinstance(other, Algorithms):
+            return Experiments([Experiment(algo, self) for algo in other])
         else:
             raise TypeError
 
@@ -239,12 +210,16 @@ class Dataset(Node):
 
 
 class Datasets(ListNode):
+    allowed_children = Dataset
+
     def __init__(self, data):
         if not self.verify(data):
             raise TypeError
-
         for ds in data:
             self.append(Dataset(ds))
+
+        self.allowed_children = Dataset
+        self.multiplies_with = (Algorithm, Algorithms)
 
     @classmethod
     def verify(cls, data):
@@ -253,156 +228,19 @@ class Datasets(ListNode):
                 return False
         return True
 
-    def __add__(self, other):
-        if type(other) is Datasets:
-            return Datasets(self + other)
-        elif type(other) is Dataset or type(other) is Generic:
-            return Datasets(self + [other])
-        else:
-            raise TypeError
-
-    def __mul__(self, other):
-        if type(other) is Algorithms:
-            return Experiments(
-                [
-                    Experiment(algorithm=algo, dataset=dataset)
-                    for algo in other
-                    for dataset in self
-                ]
-            )
-        elif type(other) is Algorithm:
-            return Experiments(
-                [
-                    Experiment(algorithm=other, dataset=dataset)
-                    for dataset in self
-                ]
-            )
-        elif type(other) is Versions:
-            if isinstance(other[0], Algorithms):
-                return self * other.flatten()
-            elif isinstance(other[0], Algorithm):
-                return self * Algorithms(other.flatten())
-            return other * self
-        else:
-            raise TypeError
-
-
-class Generic(Node):
-    @classmethod
-    def verify(cls, data):
-        return True
-
-    def __add__(self, other):
-        if type(other) is Generic:
-            return Generics([self, other])
-        elif type(other) is Generics:
-            return Generics([self]) + other
-        else:
-            raise TypeError
-
-    def __mul__(self, other):
-        if type(other) is Datasets:
-            return Experiments(
-                [Experiment(algorithm=self, dataset=item) for item in other]
-            )
-        elif type(other) is Algorithms:
-            return Experiments(
-                [Experiment(algorithm=item, dataset=self) for item in other]
-            )
-        elif type(other) is Algorithm:
-            return Experiments([Experiment(algorithm=other, dataset=self)])
-        elif type(other) is Dataset:
-            return Experiments([Experiment(algorithm=self, dataset=other)])
-        elif type(other) is Versions:
-            if isinstance(
-                other[0],
-                (
-                    Algorithms,
-                    Datasets,
-                ),
-            ):
-                return self * other.flatten()
-            return other * self
-        else:
-            raise TypeError
-
-    def __rmul__(self, other):
-        return self * other
-
-
-class Generics(ListNode):
-    def __init__(self, data):
-        for item in data:
-            self.append(Generic(item))
-
-    def __add__(self, other):
-        if type(other) is Generics:
-            return Generics(self + other)
-        elif type(other) is Generic:
-            return Generics(self + [other])
-        else:
-            raise TypeError
-
-    def __mul__(self, other):
-        if type(other) is Generics or type(other) is Datasets:
-            return Experiments(
-                [
-                    Experiment(algorithm=algo, dataset=ds)
-                    for ds in other
-                    for algo in self
-                ]
-            )
-        elif type(other) is Generic or type(other) is Dataset:
-            return Experiments(
-                [Experiment(algorithm=algo, dataset=other) for algo in self]
-            )
-        elif type(other) is Algorithm:
-            return Experiments(
-                [
-                    Experiment(algorithm=algo, dataset=ds)
-                    for algo in other
-                    for ds in self
-                ]
-            )
-        elif type(other) is Algorithm:
-            return Experiments(
-                [Experiment(algorithm=other, dataset=ds) for ds in self]
-            )
-        elif type(other) is Versions:
-            if isinstance(
-                other[0],
-                (
-                    Algorithms,
-                    Datasets,
-                ),
-            ):
-                return self * other.flatten()
-            return other * self
-        else:
-            raise TypeError
-
-    def __rmul__(self, other):
-        return self * other
-
 
 class Experiment(Node):
-    def __init__(self, algorithm, dataset):
+    def __init__(self, node_1, node_2):
+        def extract(desired_type):
+            if isinstance(node_1, desired_type):
+                return node_1
+            elif isinstance(node_2, desired_type):
+                return node_2
+            return None
 
-        self["algorithm"] = algorithm
-        self["dataset"] = dataset
-
-        if type(algorithm) is Generic or type(dataset) is Generic:
-            try:
-                print(
-                    "Warning using a Generic in an Experiment is likely going to fail!\n"
-                    f"algorithm\t{algorithm}\n"
-                    f"dataset:\t{dataset}"
-                )
-                self.verify(self)
-            except:
-                raise TypeError(
-                    "Unable to convert Generic object to Algorithm or Dataset"
-                )
+        self["algorithm"] = extract(Algorithm)
+        self["dataset"] = extract(Dataset)
+        assert self["dataset"] and self["algorithm"]
 
     @classmethod
     def verify(cls, data):
@@ -420,11 +258,12 @@ class Experiments(ListNode):
             raise TypeError
 
         for item in experiments:
-            if not type(item) is Experiment:
-                item = Experiment(
-                    algorithm=item["algorithm"], dataset=item["dataset"]
-                )
+            if not isinstance(item, Experiment):
+                item = Experiment(item["algorithm"], item["dataset"])
             self.append(item)
+
+        self.allowed_children = Experiment
+        self.multiplies_with = None
 
     @classmethod
     def verify(cls, data):
@@ -433,11 +272,3 @@ class Experiments(ListNode):
                 print(f"expected an Experiment, found {type(item)}")
                 return False
         return True
-
-    def __add__(self, other):
-        if type(other) is Experiments:
-            return Experiments(list(self) + list(other))
-        elif type(other) is Experiment:
-            return Experiments(list(self) + [other])
-        else:
-            raise TypeError
