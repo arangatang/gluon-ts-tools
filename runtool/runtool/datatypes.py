@@ -101,10 +101,23 @@ class DotDict(dict):
 
 
 class Node(dict):
+    """
+    The Node class contains functionality common to the Algorithm and Dataset classes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__add_result_class__ = list
+
     def __repr__(self):
         return f"{type(self).__name__}({self.items()})"
 
     def __mul__(self, other):
+        """
+        Calculates the cartesian product combining a Node with a Node or ListNode.
+        This returns an Experiments object with all the combinations of this Node
+        and all the Nodes in other
+        """
         if isinstance(other, Node):
             return Experiments([Experiment(self, other)])
         elif isinstance(other, ListNode):
@@ -113,6 +126,12 @@ class Node(dict):
         raise TypeError(f"Unable to multiply {type(self)} with {type(other)}")
 
     def __add__(self, other):
+        """
+        Merges multiple instances of the same Node type into an instance of
+        the class stored in `self.__add_result_class`.
+        This allows any children which inherits this node to merge into
+        a custom class by setting the `__add_result_class__` variable in self.
+        """
         if isinstance(other, type(self)):
             return self.__add_result_class__([self, other])
         elif isinstance(other, self.__add_result_class__):
@@ -122,6 +141,19 @@ class Node(dict):
 
 
 class ListNode(list):
+    """
+    The ListNode is a baseclass used for Algorithms and Datasets.
+    This class contains logic for additon and multiplying ListNodes with
+    Node and ListNode objects.
+
+    Any inherited
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.allowed_children = Node
+        self.multiplies_with = (Node, ListNode)
+
     def __repr__(self):
         child_names = ", ".join([str(child) for child in self])
         return f"{type(self).__name__}({child_names})"
