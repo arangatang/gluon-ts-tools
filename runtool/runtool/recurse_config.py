@@ -1,7 +1,47 @@
 from functools import singledispatch
 import itertools
-from runtool.datatypes import Versions
 from typing import Callable, Any
+
+
+class Versions:
+    """
+    The `Versions` class is used to represent an object which can
+    take several different values. These different values are passed
+    as a list when initializing the Versions object.
+
+    >>> Versions([1, 2, 3])
+    Versions([1, 2, 3])
+    """
+
+    def __init__(self, versions: list):
+        assert isinstance(versions, list)
+        self.__root__ = versions
+
+    def __repr__(self):
+        return f"Versions({self.__root__})"
+
+    def __getitem__(self, item):
+        return self.__root__[item]
+
+    def __len__(self):
+        return len(self.__root__)
+
+    def __iter__(self):
+        return iter(self.__root__)
+
+    def __eq__(self, other):
+        if not isinstance(other, Versions):
+            return False
+
+        if len(other) != len(self):
+            return False
+
+        # enforce same ordering and equality of children
+        for this_version, other_version in zip(self.__root__, other.__root__):
+            if this_version != other_version:
+                return False
+
+        return True
 
 
 @singledispatch
@@ -34,7 +74,7 @@ def recursive_apply(node, fn: Callable) -> Any:
 
     >>> recursive_apply(
     ...     {"double": 1},
-    ...     fn = transform
+    ...     fn=transform
     ... )
     2
 
@@ -48,7 +88,7 @@ def recursive_apply(node, fn: Callable) -> Any:
     ...             "double": 2
     ...         },
     ...     },
-    ...     fn = transform
+    ...     fn=transform
     ... )
     {'no_double': 2, 'double_this': 4}
 
@@ -64,10 +104,10 @@ def recursive_apply(node, fn: Callable) -> Any:
     ...             {"b": {"version": [3, 4]}},
     ...         ]
     ...     },
-    ...     fn = transform
+    ...     fn=transform
     ... )
     >>> type(result)
-    <class 'runtool.datatypes.Versions'>
+    <class 'recurse_config.Versions'>
     >>> for version in result:
     ...     print(version)
     {'my_list': [{'hello': 'there'}, {'a': 1}, {'b': 3}]}
@@ -108,15 +148,12 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
     new_node = {}
     for key, value in node.items():
         child = recursive_apply(value, fn)
+        # If the child is a Versions object, map the key to all its versions,
+        # child = Versions([1,2]),
+        # key = ['a']
+        # ->
+        # (('a':1), ('a':2))
         if isinstance(child, Versions):
-            # If the child is a Versions object, map the key to all its versions
-            # example:
-            # child = Versions([1,2]),
-            # key=['a']
-            #
-            # results in
-            #
-            # (('a':1), ('a':2))
             expanded_children.append(itertools.product([key], child))
         else:
             new_node[key] = child
@@ -124,9 +161,7 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
         # example:
         # expanded_children = [(('a':1), ('a':2)), (('b':1), ('b':2))]
         # new_node = {"c": 3}
-        #
         # results in:
-        #
         # [
         #   {'a':1, 'b':1, 'c':3},
         #   {'a':1, 'b':2, 'c':3},
@@ -141,13 +176,9 @@ def recursive_apply_dict(node: dict, fn: Callable) -> Any:
         ]
 
         # if the current node generated Versions object, these
-        # need to be flattened as well.
-        # i.e.
-        #
+        # need to be flattened as well. For example:
         # new_node = [Versions([1,2]), Versions([3,4])]
-        #
         # results in
-        #
         # Versions([[1,3], [1,4], [2,3], [2,4]])
         if all(isinstance(val, Versions) for val in new_node):
             return Versions(list(*itertools.product(*new_node)))
@@ -172,7 +203,7 @@ def recursive_apply_list(node: list, fn: Callable) -> Any:
         child = recursive_apply(value, fn)
         if isinstance(child, Versions):
             # child = Versions([1,2])
-            # =>
+            # ->
             # expanded_child_version = ((index, 1), (index, 2))
             expanded_child_version = itertools.product([index], child)
             versions_in_children.append(expanded_child_version)

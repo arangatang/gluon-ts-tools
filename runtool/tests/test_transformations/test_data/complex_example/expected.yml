@@ -11,7 +11,7 @@
         $eval: __trial__.dataset.meta.freq
       mini_batch_size: 128
       num_batches_per_epoch:
-        $eval: max(10, min(ceil(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size),
+        $eval: max(10, min(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size,
           100))
       prediction_length:
         $eval: 2 * __trial__.dataset.meta.prediction_length
@@ -31,7 +31,7 @@
         $eval: __trial__.dataset.meta.freq
       mini_batch_size: 128
       num_batches_per_epoch:
-        $eval: max(10, min(ceil(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size),
+        $eval: max(10, min(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size,
           100))
       prediction_length:
         $eval: 2 * __trial__.dataset.meta.prediction_length
@@ -60,7 +60,7 @@
         $eval: __trial__.dataset.meta.freq
       mini_batch_size: 128
       num_batches_per_epoch:
-        $eval: max(10, min(ceil(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size),
+        $eval: max(10, min(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size,
           100))
       prediction_length:
         $eval: 2 * __trial__.dataset.meta.prediction_length
@@ -80,7 +80,7 @@
         $eval: __trial__.dataset.meta.freq
       mini_batch_size: 128
       num_batches_per_epoch:
-        $eval: max(10, min(ceil(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size),
+        $eval: max(10, min(__trial__.dataset.meta.num_time_series / __trial__.algorithm.hyperparameters.mini_batch_size,
           100))
       prediction_length:
         $eval: 2 * __trial__.dataset.meta.prediction_length

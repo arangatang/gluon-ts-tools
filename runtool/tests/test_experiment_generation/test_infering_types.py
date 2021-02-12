@@ -1,4 +1,3 @@
-from runtool import load_config
 from runtool.datatypes import Dataset, Algorithm, Algorithms, Datasets
 import yaml
 from typing import Union

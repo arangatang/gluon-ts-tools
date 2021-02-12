@@ -6,19 +6,19 @@ from functools import partial
 from typing import Any, Callable, Tuple
 from uuid import uuid4
 
-from runtool.datatypes import DotDict, Versions
+from runtool.datatypes import DotDict
 from runtool.utils import get_item_from_path, update_nested_dict
-from runtool.recurse_config import recursive_apply
+from runtool.recurse_config import recursive_apply, Versions
 
 
-def apply_from(node: dict, data: dict) -> dict:
+def apply_from(node: dict, context: dict) -> dict:
     """
-    Update the node with the data which the path in node['$from'] is pointing to.
+    Update the node with the data which the path in node['$from'] is pointing to in the context dictionary.
     i.e.
 
     >>> apply_from(
-    ...     node = {"$from": "another_node.a_key", "some_key": "some_value"},
-    ...     data = {"another_node": {"a_key": {"hello": "world"}}}
+    ...     node={"$from": "another_node.a_key", "some_key": "some_value"},
+    ...     context={"another_node": {"a_key": {"hello": "world"}}}
     ... )
     {'hello': 'world', 'some_key': 'some_value'}
 
@@ -26,26 +26,27 @@ def apply_from(node: dict, data: dict) -> dict:
     ----------
     node
         The node which should be processed.
-    data:
-        Data which can be referenced if $from is in node.
+    context:
+        Data which can be referenced by the path in node["$from"].
     Returns
     -------
     Dict
-        the `node` updated with values from `data`
+        the `node` updated with values from `context[node["from"]]`
     """
     if not (isinstance(node, dict) and "$from" in node):
         return node
 
-    node = dict(**node)  # needed if $from reference another $from
-    path = node.pop("$from")
-    from_value = get_item_from_path(data, path)
-    from_value = recursive_apply(from_value, partial(apply_from, data=data))
+    source = get_item_from_path(context, node.pop("$from"))
+
+    # resolve any $from in the node we inherit from
+    # this is to avoid updating the node with a new $from
+    source = recursive_apply(source, partial(apply_from, context=context))
 
     assert isinstance(
-        from_value, dict
+        source, dict
     ), "$from can only be used to inherit from a dict"
-    from_value = update_nested_dict(from_value, node)
-    return dict(**from_value)
+
+    return update_nested_dict(source, node)
 
 
 def apply_ref(node: dict, context: dict) -> Any:
@@ -61,7 +62,7 @@ def apply_ref(node: dict, context: dict) -> Any:
 
     >>> apply_ref(
     ...     node={"$ref": "some_node.0.some_val"},
-    ...     context = {
+    ...     context={
     ...         "target": 1,
     ...         "some_node": [
     ...             {"some_val": {"$ref": "target"}},
@@ -90,58 +91,50 @@ def apply_ref(node: dict, context: dict) -> Any:
     return recursive_apply(data, partial(apply_ref, context=context))
 
 
-def evaluate(text: str, locals: dict) -> Any:
+def evaluate(expression: str, locals: dict) -> Any:
     """
-    Performs the python function `eval` on the text.
-    The text will have access to the values in the parameter `locals`
-    when `eval` is applied. Further functionality such as a unique id `uid`
-    as well as the `math` package is available when evaluating the text.
+    Performs the python function `eval` using the `expression`.
+    The evaluated expression will have access to the values in `locals`
+    when `eval` is applied as well as to a unique id `uid`.
 
     >>> evaluate(
-    ...     text = "len(uid) + pow(some_value, 2)",
-    ...     locals = {"some_value": 2}
+    ...     expression="len(uid) + some_value",
+    ...     locals={"some_value": 2}
     ... )
-    16.0
+    14
 
     Parameters
     ----------
-    text
-        The text which should be evaluated
+    expression
+        The expression which should be evaluated
     locals
         The locals parameter to the `eval` function in the standard library.
     Returns
     -------
     Any
-        The value after applying `eval` to the text.
+        The value after applying `eval` to the expression.
     """
-    uid = str(uuid4()).split("-")[-1]
-    locals = dict(DotDict(locals))
-    globals = {**math.__dict__, "uid": uid}
-    ret = eval(
-        text,
-        globals,
-        locals,
+    return eval(
+        expression,
+        dict(uid=str(uuid4()).split("-")[-1]),
+        dict(DotDict(locals)),
     )
-    if isinstance(ret, dict) and "$eval" in ret:
-        return apply_eval(ret, locals)
-    return ret
 
 
 def recurse_eval(path: str, data: dict, fn: Callable) -> Tuple[str, Any]:
     """
-    Given a `path` to fetch from in the `data`, this function identifies
-    which parts of the path are actually in the `data` and what parts are
-    attributes of the value which will be extracted.
-    furthermore, this function calls `fn` on the data extracted from `data`
-    and returns the result.
+    Given a `path` such as `a.b.0.split(' ')` this function traverses
+    the `data` dictionary using the path, stopping whenever a key cannot be
+    found in the `data`. `fn` is then applied to the extracted data and the
+    result is returned along with the part of the path which was traversed.
 
     In the following example, `a.b.0` is identified as the path to return
     since `.split()` is not an item in `data`.
 
     >>> recurse_eval(
-    ...     path = "a.b.0.split(' ')",
-    ...     data = {"a": {"b": [{"$eval": "'hey ' * 2"}]}},
-    ...     fn = lambda node, _ : eval(node["$eval"]) if "$eval" in node else node
+    ...     path="a.b.0.split(' ')",
+    ...     data={"a": {"b": [{"$eval": "'hey ' * 2"}]}},
+    ...     fn=lambda node, _ : eval(node["$eval"]) if "$eval" in node else node
     ... )
     ('a.b.0', 'hey hey ')
 
@@ -150,7 +143,7 @@ def recurse_eval(path: str, data: dict, fn: Callable) -> Tuple[str, Any]:
     path
         The path to fetch from in the data
     data
-        Dictionary from which data should be fetched
+        Dictionary which should be traversed using the path
     fn
         function to call with the fetched data as parameter
     Returns
@@ -254,7 +247,9 @@ def apply_eval(node: dict, locals: dict) -> Any:
             text = text.replace(path, str(value))
 
     try:
-        return evaluate(text, locals)
+        # continue recursion as to handle any $eval nodes
+        # generated after evaluating the current node.
+        return apply_eval(evaluate(text, locals), locals)
     except NameError as error:
         if "__trial__" in str(error):
             node["$eval"] = text
@@ -314,7 +309,9 @@ def apply_trial(node: dict, locals: dict) -> Any:
         else:
             text = text.replace(substring, str(value))
 
-    return evaluate(text, locals)
+    # continue recursion as to handle any $eval nodes
+    # generated after evaluating the current node.
+    return apply_eval(evaluate(text, locals), locals)
 
 
 def apply_each(node: dict) -> Versions:
@@ -377,21 +374,21 @@ def apply_each(node: dict) -> Versions:
         )
 
     # Generate versions of the current node
-    new = []
+    versions = []
     for item in each:
         if item == "$None":
             # return unaltered node
             # node = {"a": 1, "$each": ["$None"]}
             # ==>
             # {"a": 1}
-            new.append(node)
+            versions.append(node)
         elif isinstance(item, dict):
             # merge node with value in $each
             # node = {"a": 1, "$each": [{"b: 2"}]}
             # ==>
             # {"a": 1, "b": 2}
             item.update(node)
-            new.append(item)
+            versions.append(item)
         else:
             # any other value overwrites the node if node is
             # otherwise empty.
@@ -405,5 +402,5 @@ def apply_each(node: dict) -> Versions:
                     " when using dictionaries or with the $None operator."
                     f" The error occured in:\n{node}"
                 )
-            new.append(item)
-    return Versions(new)
+            versions.append(item)
+    return Versions(versions)

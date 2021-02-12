@@ -13,7 +13,7 @@ DeepARPlus:
     freq:
       $eval: $trial.dataset.meta.freq
     num_batches_per_epoch:
-      $eval: max(10, min(ceil($trial.dataset.meta.num_time_series / $trial.algorithm.hyperparameters.mini_batch_size), 100))
+      $eval: max(10, min($trial.dataset.meta.num_time_series / $trial.algorithm.hyperparameters.mini_batch_size, 100))
     prediction_length:
       $eval: 2 * $trial.dataset.meta.prediction_length
     context_length:

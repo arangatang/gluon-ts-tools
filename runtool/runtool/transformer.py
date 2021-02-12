@@ -1,6 +1,6 @@
 from functools import partial
 
-from runtool.recurse_config import recursive_apply
+from runtool.recurse_config import recursive_apply, Versions
 from runtool.transformations import (
     apply_eval,
     apply_from,
@@ -8,7 +8,6 @@ from runtool.transformations import (
     apply_trial,
     apply_each,
 )
-from runtool.datatypes import Versions
 
 
 def apply_transformations(data: dict) -> list:
@@ -31,7 +30,7 @@ def apply_transformations(data: dict) -> list:
     ... )
     >>> for version in result:
     ...     print(version)
-    {'a': {'smth': 49.0, 'msg': 'hi'}, 'base': {'msg': 'hi'}, 'b': ['hi']}
+    {'a': {'smth': 49, 'msg': 'hi'}, 'base': {'msg': 'hi'}, 'b': ['hi']}
     {'a': {'smth': 2, 'msg': 'hi'}, 'base': {'msg': 'hi'}, 'b': ['hi']}
 
     Parameters
@@ -43,7 +42,7 @@ def apply_transformations(data: dict) -> list:
     list
         the transformed `data` where each item is a version of the data.
     """
-    data = recursive_apply(data, partial(apply_from, data=data))
+    data = recursive_apply(data, partial(apply_from, context=data))
     data = recursive_apply(data, partial(apply_eval, locals=data))
     data = recursive_apply(data, apply_each)
 

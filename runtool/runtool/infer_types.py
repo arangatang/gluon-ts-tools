@@ -5,8 +5,8 @@ from runtool.datatypes import (
     Algorithms,
     Dataset,
     Datasets,
-    Versions,
 )
+from runtool.recurse_config import Versions
 
 
 def infer_type(node: Union[list, dict]) -> Any:

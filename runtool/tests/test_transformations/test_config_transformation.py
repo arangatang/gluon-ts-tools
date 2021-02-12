@@ -497,18 +497,6 @@ def test_eval_with_trial():
     )
 
 
-def test_eval_math():
-    assert_config_equal(
-        source="""
-        base:
-            $eval: ceil(0.8)
-        """,
-        expected="""
-        - base: 1
-        """,
-    )
-
-
 def test_eval_algorithm_dataset_dependency():
     assert_config_equal(
         source="""

@@ -1,4 +1,4 @@
-from runtool.datatypes import Versions
+from runtool.recurse_config import Versions
 from runtool.transformations import (
     apply_each,
     apply_eval,
@@ -99,7 +99,7 @@ def test_apply_ref_nested():
 def test_evaluate():
     assert (
         evaluate(
-            text="2 + 2",
+            expression="2 + 2",
             locals={},
         )
         == 4
@@ -109,10 +109,10 @@ def test_evaluate():
 def test_evaluate_with_mathlib_and_locals():
     assert (
         evaluate(
-            text="len(uid) + pow(some_value, 2)",
+            expression="len(uid) + some_value",
             locals={"some_value": 2},
         )
-        == 16
+        == 14
     )
 
 

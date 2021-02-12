@@ -1,5 +1,4 @@
 from runtool import transformer
-from runtool.runtool import load_config
 
 
 def parse(data):
