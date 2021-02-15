@@ -1,8 +1,6 @@
-from functools import singledispatch
-from typing import Any, Dict, List, Union
+from typing import Any, Union
 
 from runtool.datatypes import Algorithm, Algorithms, Dataset, Datasets
-from runtool.recurse_config import Versions
 
 
 def infer_type(node: Union[list, dict]) -> Any:
@@ -23,20 +21,5 @@ def infer_type(node: Union[list, dict]) -> Any:
     return node
 
 
-@singledispatch
-def convert(data: Any) -> Any:
-    """
-    Base case of singledispatch which converts a
-    JSON-like structure to Algorithms, Datasets and Generics
-    """
-    return data
-
-
-@convert.register
-def convert_list(data: list) -> list:
-    return [infer_type(item) for item in data]
-
-
-@convert.register
-def convert_dict(data: dict) -> dict:
+def infer_types(data: dict) -> dict:
     return {key: infer_type(value) for key, value in data.items()}

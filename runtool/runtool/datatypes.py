@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Dict, List, Union
+from typing import Any, List, Union
 
 
 class DotDict(dict):
@@ -59,18 +59,14 @@ class Node(dict):
     The `Node` class contains logic common to the `Algorithm` and `Dataset` classes.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__add_result_class__ = list
-
     def __repr__(self):
         return f"{type(self).__name__}({self.items()})"
 
     def __mul__(self, other):
         """
-        Calculates the cartesian product combining a Node with a Node or ListNode.
-        This returns an Experiments object with all the combinations of this Node
-        and all the Nodes in other
+        Calculates the cartesian product combining a `Node` with a `Node` or `ListNode`.
+        This returns an Experiments object with all the combinations of this `Node`
+        and the items in `other`.
         """
         if isinstance(other, Node):
             return Experiments([Experiment(self, other)])
@@ -107,7 +103,7 @@ class ListNode(list):
 
     def __add__(self, other):
         """
-        Returns a new ListNode containing `other` appended to `self`.
+        Returns a new `ListNode` containing `other` appended to `self`.
         """
         if isinstance(other, type(self)):
             return type(self)(list(self) + list(other))

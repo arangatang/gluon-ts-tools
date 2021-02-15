@@ -1,11 +1,11 @@
 from functools import singledispatch
 from pathlib import Path
-from typing import Iterable, Union
+from typing import Iterable
 
 import yaml
 
 from runtool.datatypes import DotDict
-from runtool.infer_types import convert, infer_type
+from runtool.infer_types import infer_types
 from runtool.recurse_config import Versions
 from runtool.transformer import apply_transformations
 
@@ -45,38 +45,43 @@ def generate_versions(data: Iterable) -> dict:
 
 
 @singledispatch
-def load_config(data):
+def load_config(_):
+    """
+    The load_config singledispatch function loads a config.yml file into a DotDict.
+    This function is overloaded such that it can load a config in multiple ways.
+    See each overloading function for details.
+    """
     raise TypeError(
         "load_config takes either a dict or a path to a config.yml file."
     )
 
 
 @load_config.register
-def load_config_str(data: str):
+def load_config_str(path: str):
     """
     Converts the passed data to a pathlib.Path object and recursivelly calls load_config.
     """
-    return load_config(Path(data))
+    return load_config(Path(path))
 
 
 @load_config.register
-def load_config_path(data: Path):
+def load_config_path(path: Path):
     """
     Loads a config file from a path and recursively calls load_config on the loaded data.
     """
-    with data.open() as file:
+    with path.open() as file:
         return load_config(yaml.safe_load(file))
 
 
 @load_config.register
-def load_config_dict(data: dict):
+def load_config_dict(config: dict):
     """
-    applies transformation to the passed data and infers the datatypes on the returned data.
+    Applies transformation to the passed data and infers the datatypes on the returned data.
     The datatypes are then merged into a dict with Versions object for those keys which map to
     multiple values.
     """
     return DotDict(
         generate_versions(
-            convert(item) for item in apply_transformations(data)
+            infer_types(item) for item in apply_transformations(config)
         )
     )
