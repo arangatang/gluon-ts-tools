@@ -156,6 +156,8 @@ class Algorithms(ListNode):
 
     @classmethod
     def verify(cls, data):
+        if not data:
+            return False
         return all(map(Algorithm.verify, data))
 
 
@@ -182,6 +184,8 @@ class Datasets(ListNode):
 
     @classmethod
     def verify(cls, data):
+        if not data:
+            return False
         return all(map(Dataset.verify, data))
 
 
