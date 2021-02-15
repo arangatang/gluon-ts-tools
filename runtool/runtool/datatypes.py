@@ -60,7 +60,7 @@ class Node(dict):
     """
 
     def __repr__(self):
-        return f"{type(self).__name__}({self.items()})"
+        return f"{type(self).__name__}({dict(self)})"
 
     def __mul__(self, other):
         """
