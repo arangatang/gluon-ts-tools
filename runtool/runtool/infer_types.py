@@ -1,11 +1,7 @@
 from functools import singledispatch
-from typing import Any, Union, List, Dict
-from runtool.datatypes import (
-    Algorithm,
-    Algorithms,
-    Dataset,
-    Datasets,
-)
+from typing import Any, Dict, List, Union
+
+from runtool.datatypes import Algorithm, Algorithms, Dataset, Datasets
 from runtool.recurse_config import Versions
 
 

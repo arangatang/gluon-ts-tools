@@ -1,10 +1,13 @@
 from functools import singledispatch
-from runtool.transformer import apply_transformations
-from runtool.infer_types import infer_type, convert
-from runtool.datatypes import DotDict, Versions
-from typing import Union, Iterable
 from pathlib import Path
+from typing import Iterable, Union
+
 import yaml
+
+from runtool.datatypes import DotDict
+from runtool.infer_types import convert, infer_type
+from runtool.recurse_config import Versions
+from runtool.transformer import apply_transformations
 
 
 def generate_versions(data: Iterable) -> dict:

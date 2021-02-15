@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any, Dict, List, Union
 
 
@@ -55,7 +56,7 @@ class DotDict(dict):
 
 class Node(dict):
     """
-    The Node class contains functionality common to the Algorithm and Dataset classes.
+    The `Node` class contains logic common to the `Algorithm` and `Dataset` classes.
     """
 
     def __init__(self, *args, **kwargs):
@@ -78,59 +79,59 @@ class Node(dict):
 
         raise TypeError(f"Unable to multiply {type(self)} with {type(other)}")
 
-    def __add__(self, other):
+    def __add__(self, other, result_type=list):
         """
         Merges multiple instances of the same Node type into an instance of
-        the class stored in `self.__add_result_class`.
-        This allows any children which inherits this node to merge into
-        a custom class by setting the `__add_result_class__` variable in self.
+        the class `result_type`. This allows any children which inherits this
+        node to add by setting the `result_type` variable to another value.
         """
         if isinstance(other, type(self)):
-            return self.__add_result_class__([self, other])
-        elif isinstance(other, self.__add_result_class__):
-            return self.__add_result_class__([self]) + other
+            return result_type([self, other])
+        elif isinstance(other, result_type):
+            return result_type([self]) + other
 
         raise TypeError
 
 
 class ListNode(list):
     """
-    The ListNode is a baseclass used for Algorithms and Datasets.
-    This class contains logic for additon and multiplying ListNodes with
-    Node and ListNode objects.
-
-    Any inherited
+    The ListNode is the base class of the
+    `Algorithms`, `Datasets` and `Experiments` classes.
+    This class contains logic for adding and multiplying `Nodes`
+    and `ListNodes` with eachother.
     """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.allowed_children = Node
-        self.multiplies_with = (Node, ListNode)
 
     def __repr__(self):
         child_names = ", ".join([str(child) for child in self])
         return f"{type(self).__name__}({child_names})"
 
     def __add__(self, other):
+        """
+        Returns a new ListNode containing `other` appended to `self`.
+        """
         if isinstance(other, type(self)):
             return type(self)(list(self) + list(other))
-        elif isinstance(other, self.allowed_children):
+        elif isinstance(other, Node):
             return type(self)(list(self) + [other])
 
         raise TypeError
 
     def __mul__(self, other):
-        if isinstance(other, self.multiplies_with):
-            if isinstance(other, ListNode):
-                return Experiments(
-                    [
-                        Experiment(node_1, node_2)
-                        for node_1 in self
-                        for node_2 in other
-                    ]
-                )
-            elif isinstance(other, Node):
-                return Experiments([Experiment(item, other) for item in self])
+        """
+        Calculates the cartesian product of items in
+        `self` and `other` and returns an `Experiment` object
+        with the results.
+        """
+        if isinstance(other, ListNode):
+            return Experiments(
+                [
+                    Experiment(node_1, node_2)
+                    for node_1 in self
+                    for node_2 in other
+                ]
+            )
+        elif isinstance(other, Node):
+            return Experiments([Experiment(item, other) for item in self])
 
         raise TypeError
 
@@ -138,7 +139,7 @@ class ListNode(list):
 class Algorithm(Node):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__add_result_class__ = Algorithms
+        self.__add__ = partial(super().__add__, result_type=Algorithms)
 
     @classmethod
     def verify(cls, data: dict) -> bool:
@@ -156,8 +157,6 @@ class Algorithms(ListNode):
             raise TypeError
 
         self.extend(Algorithm(algo) for algo in data)
-        self.allowed_children = Algorithm
-        self.multiplies_with = (Dataset, Datasets)
 
     @classmethod
     def verify(cls, data):
@@ -167,7 +166,7 @@ class Algorithms(ListNode):
 class Dataset(Node):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__add_result_class__ = Datasets
+        self.__add__ = partial(super().__add__, result_type=Datasets)
 
     @classmethod
     def verify(cls, data: dict) -> bool:
@@ -184,8 +183,6 @@ class Datasets(ListNode):
             raise TypeError
 
         self.extend(Dataset(ds) for ds in data)
-        self.allowed_children = Dataset
-        self.multiplies_with = (Algorithm, Algorithms)
 
     @classmethod
     def verify(cls, data):
@@ -204,7 +201,7 @@ class Experiment(dict):
         self["algorithm"] = extract(Algorithm)
         self["dataset"] = extract(Dataset)
 
-        if not (self["dataset"] and self["algorithm"]):
+        if not Experiment.verify(self):
             raise TypeError(
                 "An Experiment requires a Dataset and an Algorithm, got:"
                 f"{type(node_1)} and {type(node_2)}"
@@ -230,8 +227,6 @@ class Experiments(ListNode):
             else Experiment(item["algorithm"], item["dataset"])
             for item in experiments
         )
-
-        self.allowed_children = Experiment
 
     @classmethod
     def verify(cls, data: dict) -> bool:
