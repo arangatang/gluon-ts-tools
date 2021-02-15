@@ -1,12 +1,12 @@
+import pytest
 from runtool.datatypes import (
-    Algorithms,
     Algorithm,
-    Datasets,
+    Algorithms,
     Dataset,
+    Datasets,
     Experiment,
     Experiments,
 )
-import pytest
 
 ALGORITHM = Algorithm(
     {
@@ -29,46 +29,124 @@ DATASET = Dataset(
 )
 
 EXPERIMENT = Experiment(ALGORITHM, DATASET)
+ALGORITHMS = lambda num: Algorithms([ALGORITHM for _ in range(num)])
+DATASETS = lambda num: Datasets([DATASET for _ in range(num)])
+EXPERIMENTS = lambda num: Experiments([EXPERIMENT for _ in range(num)])
+
+
+def perform_typeerror_test(data, to_multiply):
+    for item in to_multiply:
+        with pytest.raises(TypeError):
+            data * item
+        with pytest.raises(TypeError):
+            item * data
 
 
 def test_algorithm_mul_algorithm():
-    with pytest.raises(TypeError):
-        ALGORITHM * ALGORITHM
+    perform_typeerror_test(ALGORITHM, (ALGORITHM, ALGORITHMS(2)))
 
 
-def test_algorithm_mul_algorithms():
-    with pytest.raises(TypeError):
-        ALGORITHM * Algorithms([ALGORITHM])
+def test_algorithms_mul_algorithms():
+    perform_typeerror_test(ALGORITHMS(2), (ALGORITHMS(2)))
 
 
 def test_dataset_mul_dataset():
-    with pytest.raises(TypeError):
-        DATASET * DATASET
+    perform_typeerror_test(DATASET, (DATASET, DATASETS(2)))
 
 
-def test_dataset_mul_datasets():
-    with pytest.raises(TypeError):
-        DATASET * Datasets([DATASET])
+def test_datasets_mul_datasets():
+    perform_typeerror_test(DATASETS(2), (DATASETS(2)))
 
 
 def test_algorithm_mul_dataset():
-    assert ALGORITHM * DATASET == Experiments([EXPERIMENT])
-    assert DATASET * ALGORITHM == Experiments([EXPERIMENT])
+    assert ALGORITHM * DATASET == EXPERIMENTS(1)
+    assert DATASET * ALGORITHM == EXPERIMENTS(1)
 
 
 def test_algorithm_mul_datasets():
-    assert ALGORITHM * Datasets([DATASET]) == Experiments([EXPERIMENT])
-    assert Datasets([DATASET]) * ALGORITHM == Experiments([EXPERIMENT])
+    assert ALGORITHM * DATASETS(2) == EXPERIMENTS(2)
+    assert DATASETS(2) * ALGORITHM == EXPERIMENTS(2)
+
+
+def test_algorithms_mul_dataset():
+    assert ALGORITHMS(2) * DATASET == EXPERIMENTS(2)
+    assert DATASET * ALGORITHMS(2) == EXPERIMENTS(2)
+
+
+def test_algorithms_mul_datasets():
+    assert DATASETS(2) * ALGORITHMS(2) == EXPERIMENTS(4)
+    assert ALGORITHMS(2) * DATASETS(2) == EXPERIMENTS(4)
 
 
 def test_algorithm_plus_algorithm():
-    assert ALGORITHM + ALGORITHM == Algorithms([ALGORITHM, ALGORITHM])
+    assert ALGORITHM + ALGORITHM == ALGORITHMS(2)
 
 
 def test_algorithm_plus_algorithms():
-    assert ALGORITHM + Algorithms([ALGORITHM, ALGORITHM]) == Algorithms(
-        [ALGORITHM, ALGORITHM, ALGORITHM]
+    assert ALGORITHM + ALGORITHMS(2) == ALGORITHMS(3)
+    assert ALGORITHMS(2) + ALGORITHM == ALGORITHMS(3)
+
+
+def test_algorithm_plus_dataset():
+    with pytest.raises(TypeError):
+        ALGORITHM + DATASET
+        DATASET + ALGORITHM
+
+
+def test_algorithms_plus_dataset():
+    with pytest.raises(TypeError):
+        ALGORITHMS(1) + DATASET
+        DATASET + ALGORITHMS(1)
+
+
+def test_datasets_plus_algorithm():
+    with pytest.raises(TypeError):
+        DATASETS(1) + ALGORITHM
+        ALGORITHM + DATASETS(1)
+
+
+def test_datasets_plus_algorithms():
+    with pytest.raises(TypeError):
+        DATASETS(1) + ALGORITHMS(1)
+        ALGORITHMS(1) + DATASETS(1)
+
+
+def test_experiment_plus_experiment():
+    assert EXPERIMENT + EXPERIMENT == EXPERIMENTS(2)
+
+
+def test_experiment_plus_experiments():
+    assert EXPERIMENT + EXPERIMENTS(2) == EXPERIMENTS(3)
+    assert EXPERIMENTS(2) + EXPERIMENT == EXPERIMENTS(3)
+
+
+def test_experiments_plus_experiments():
+    assert EXPERIMENTS(2) + EXPERIMENTS(2) == EXPERIMENTS(4)
+
+
+def test_experiment_mul():
+    perform_typeerror_test(
+        EXPERIMENT,
+        (
+            ALGORITHM,
+            ALGORITHMS(2),
+            DATASET,
+            DATASETS(2),
+            EXPERIMENT,
+            EXPERIMENTS(2),
+        ),
     )
-    assert Algorithms([ALGORITHM, ALGORITHM]) + ALGORITHM == Algorithms(
-        [ALGORITHM, ALGORITHM, ALGORITHM]
+
+
+def test_experiments_mul():
+    perform_typeerror_test(
+        EXPERIMENTS(2),
+        (
+            ALGORITHM,
+            ALGORITHMS(2),
+            DATASET,
+            DATASETS(2),
+            EXPERIMENT,
+            EXPERIMENTS(2),
+        ),
     )
