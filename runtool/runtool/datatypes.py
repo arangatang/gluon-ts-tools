@@ -56,36 +56,45 @@ class DotDict(dict):
 
 class ListNode(list):
     """
-    A ListNode is a python list which can be added and multiplied
+    A `ListNode` is a python list which can be added and multiplied
     with other `Node` and `ListNode` objects.
 
     NOTE:
-        The ListNode is meant to be subclassed by the
+        The `ListNode` is meant to be subclassed by the
         `Algorithms`, `Datasets` and `Experiments` classes.
 
-    One can add a ListNode with another ListNode in order to get
-    a new ListNode with the contents of the two.
+    A `ListNode` plus a `ListNode` or `Node` results in a new `ListNode` with
+    the contents of the two.
 
     >>> my_listnode = ListNode([Node({"hi": "there"})])
     >>> my_listnode + my_listnode
     ListNode([Node({'hi': 'there'}), Node({'hi': 'there'})])
 
-    It is also possible to add a Node to a ListNode
     >>> my_listnode + Node({})
     ListNode([Node({'hi': 'there'}), Node({})])
 
-    The addition is not commutative so ordering matters.
+    The addition is not commutative so the order matters.
     >>> Node({}) + my_listnode
     ListNode([Node({}), Node({'hi': 'there'})])
 
-    If two ListNodes are multiplied they generate an Experiments object
-    containing the cartesian product of all the items within the two ListNodes.
+    If two `ListNodes` are multiplied they generate an `Experiments` object
+    containing the cartesian product of all the items within the two `ListNodes`.
+    The same is true when multiplying a `ListNode` with a `Node`.
 
     NOTE:
-        Experiment objects requires an `Algorithm` and `Dataset` object,
-        otherwise an error is thrown. For help understanding the example
-        below, please refer to the documentation for `Algorithm`,
-        `Dataset`, `Experiment` and `Experiments`.
+        The generated `Experiments` objects consists of multiple `Experiment`
+        objects. Each`Experiment` objects requires an `Algorithm` and a `Dataset`
+        object to be passed to them during initialization, otherwise an error
+        is thrown. In order to satisfy this requirement, one of the ListNodes
+        being multiplied needs to contain only `Algorithm` object and one of the
+        ListNodes needs to contain only `Dataset` objects.
+
+        Please refer to the documentation for `Algorithm`,
+        `Dataset`, `Experiment` and `Experiments` for more details.
+
+    Example:
+    Multiplying a `ListNode` containing `Algorithm` objects with a `ListNode`
+    containing `Dataset` objects. This generates an `Experiments` object.
 
     >>> algorithms = ListNode(
     ...     [
@@ -126,7 +135,7 @@ class ListNode(list):
         child_names = ", ".join([str(child) for child in self])
         return f"{type(self).__name__}([{child_names}])"
 
-    def __add__(self, other) -> Any:
+    def __add__(self, other: Union["Node", "ListNode"]) -> Any:
         """
         Returns a new `ListNode` (or any subclass) with `other` appended to `self`.
         """
@@ -137,13 +146,15 @@ class ListNode(list):
 
         raise TypeError
 
-    def __mul__(self, other) -> "Experiments":
+    def __mul__(self, other: Union["Node", "ListNode"]) -> "Experiments":
         """
         Calculates the cartesian product of items in
         `self` and `other` and returns an `Experiment` object
         with the results.
         """
-        if isinstance(other, ListNode):
+        if isinstance(other, ListNode) and not isinstance(
+            other, (Experiments, Experiment)
+        ):
             return Experiments(
                 [
                     Experiment(node_1, node_2)
@@ -162,7 +173,9 @@ class Experiments(ListNode):
     The `Experiments` class contains a set of `Experiment` objects.
     Essentially, this class corresponds to a set of experiments one
     wish to execute.
-    An `Experiments` object can be added with another `Experiment` object
+
+    Since `Experiments` inherits from ListNode, they can be added.
+    However, `Experiments` cannot be multiplied.
 
     >>> experiments = Experiments(
     ...     [
@@ -172,11 +185,15 @@ class Experiments(ListNode):
     ...         )
     ...     ]
     ... )
-    >>> len(experiments + experiments + experiments)
-    3
+    >>> len(experiments + experiments)
+    2
+    >>> type(experiments + experiments)
+    <class 'runtool.datatypes.Experiments'>
     """
 
-    def __init__(self, experiments: Union[List[dict], List["Experiment"]]):
+    def __init__(
+        self, experiments: Union[Iterable[dict], Iterable["Experiment"]]
+    ):
         if not self.verify(experiments):
             raise TypeError
 
@@ -189,14 +206,19 @@ class Experiments(ListNode):
 
     @classmethod
     def verify(cls, data: dict) -> bool:
+        """
+        Check if the data has the correct structure to instantiate an
+        experiment. Any iterable containing valid `Experiment` objects
+        are valid `Experiments` object.
+        """
         return all(map(Experiment.verify, data))
 
-    __mul__ = None  # Several Experiments cannot be multiplied
+    __mul__ = None  # Experiments cannot be multiplied
 
 
 class Datasets(ListNode):
     """
-    The Datasets class contains a set of Dataset objects.
+    The Datasets class contains a set of `Dataset` objects.
     >>> datasets = Datasets([Dataset({"path": {}})])
     >>> len(datasets)
     1
@@ -246,6 +268,18 @@ class Datasets(ListNode):
     ...     ]
     ... )
     True
+
+    Upon instantiating a `Datasets` object with an iterable
+    the Datasets.verify method checks that the iterable has the
+    correct structure. If it does not, a TypeError is raised.
+
+    >>> Datasets([Dataset({"smth": 1})])
+    Traceback (most recent call last):
+        ...
+    TypeError
+    >>> Datasets([Dataset({"path": {}})])
+    Datasets([Dataset({'path': {}})])
+
     """
 
     def __init__(self, iterable: Iterable):
@@ -255,7 +289,11 @@ class Datasets(ListNode):
         self.extend(Dataset(ds) for ds in iterable)
 
     @classmethod
-    def verify(cls, data: Any) -> bool:
+    def verify(cls, data: Iterable) -> bool:
+        """
+        Any non empty iterable with valid `Dataset`
+        objects is a valid `Datasets` object.
+        """
         if not data:
             return False
 
@@ -314,6 +352,18 @@ class Algorithms(ListNode):
     ...     ]
     ... )
     True
+
+    Upon instantiating a `Algorithms` object with an iterable
+    the Algorithms.verify method checks that the iterable has the
+    correct structure. If it does not, a TypeError is raised.
+
+    >>> Algorithms([{"a": "1"}])
+    Traceback (most recent call last):
+        ...
+    TypeError
+    >>> Algorithms([Algorithm({"image": "", "instance": ""})])
+    Algorithms([Algorithm({'image': '', 'instance': ''})])
+
     """
 
     def __init__(self, data):
@@ -323,7 +373,11 @@ class Algorithms(ListNode):
         self.extend(Algorithm(algo) for algo in data)
 
     @classmethod
-    def verify(cls, data) -> bool:
+    def verify(cls, data: Iterable) -> bool:
+        """
+        Any non empty iterable containing valid `Algorithm`
+        objects is a valid `Algorithms` object.
+        """
         if not data:
             return False
         return all(map(Algorithm.verify, data))
@@ -331,8 +385,8 @@ class Algorithms(ListNode):
 
 class Node(dict):
     """
-    A `Node` is a dictionary which can be added and multiplied.
-    Per default
+    A `Node` is a dictionary which can be added and multiplied with
+    `Node` and `ListNode` objects.
 
     NOTE:
         This class is meant to be subclassed by the:
@@ -346,17 +400,26 @@ class Node(dict):
     >>> my_node + my_node
     ListNode([Node({'hello': 'world'}), Node({'hello': 'world'})])
 
-    If two nodes are multiplied they generate an Experiments object
-    with one item.
+    However, this can be overriden by setting the `result_type` variable
+    of the `Node`. This is especially useful when subclassing the `Node` class.
+
+    >>> class my_class(Node):
+    ...     result_type = tuple
+    >>> my_class({}) + my_class({"hi": 1})
+    (my_class({}), my_class({'hi': 1}))
+
+    A `Node` can be multiplied with either a `Node` or `ListNode` object.
+    When multiplied, the results will be an `Experiments` object.
 
     NOTE:
-        Experiment objects requires an `Algorithm` and `Dataset` object,
-        otherwise an error is thrown.
+        The `Experiment` class requires an `Algorithm` and `Dataset` object,
+        upon instantiation otherwise an error is thrown.
         Please refer to the documentation for `Algorithm` and
         `Dataset` for examples of multiplication of `Node` objects.
     """
 
-    result_type = ListNode
+    # This variable determines what datatype __add__ returns
+    result_type: Iterable = ListNode
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({dict(self)})"
@@ -364,7 +427,7 @@ class Node(dict):
     def __mul__(self, other) -> "Experiments":
         """
         Calculates the cartesian product combining a `Node` with a `Node` or `ListNode`
-        and returns an `Experiment` object containing the result.
+        and returns an `Experiments` object containing the result.
         """
         if isinstance(other, Node):
             return Experiments([Experiment(self, other)])
@@ -376,13 +439,9 @@ class Node(dict):
     def __add__(self, other) -> Any:
         """
         Merges multiple instances of the same Node type into an instance of
-        the class passed to the `result_type` parameter.
+        the class stored in the `self.result_type` variable.
         This allows any classes inheriting from `Node` to customize the
         return type of __add__ without redefining the logic.
-
-        NOTE::
-            The result_type needs to take a `list` as an __init__ parameter
-            and it has to have the __add__ method implemented.
         """
         if isinstance(other, type(self)):
             return self.result_type([self, other])
@@ -396,10 +455,9 @@ class Algorithm(Node):
     """
     The `Algorithm` class represents a single algorithm in a config file.
     The class contains rules for identifying if an object has the
-    correct structure to be an `Algorithm` as well as logic for
-    multiplication and addition.
+    correct structure to be an `Algorithm`, see the `verify` method.
 
-    Two `Algorithm` objects can be added together to form a
+    Two `Algorithm` objects can be added together to form an
     `Algorithms` object.
 
     >>> algorithm = Algorithm({"image": "", "instance": ""})
@@ -412,8 +470,8 @@ class Algorithm(Node):
     >>> algorithm * Dataset({"path": {}})
     Experiments([Experiment({'algorithm': Algorithm({'image': '', 'instance': ''}), 'dataset': Dataset({'path': {}})})])
 
-    An Algorithm can also be multiplied with a Dataset object in order to
-    form several experiments at once.
+    An Algorithm can also be multiplied with a `Datasets` object in order to
+    form several `Experiment` objects at once.
     >>> algorithm * Datasets(
     ...     [{"path": {"1": ""}}, {"path": {"2": ""}}]
     ... ) == Experiments(
@@ -431,8 +489,7 @@ class Algorithm(Node):
     True
     """
 
-    # set that Algorithms should be generated when
-    # adding two Algorithm objects
+    # __add__ returns an Algorithms object
     result_type = Algorithms
 
     def __init__(self, *args, **kwargs):
@@ -445,22 +502,20 @@ class Algorithm(Node):
         """
         Determines if data has the structure needed to be an Algorithm.
         An Algorithm is defined as being a dictionary with atleast
-        these two keys:
+        these two key-value pairs:
 
-        - image
-        - instance
+        - image: String
+        - instance: String
+        - hyperparameters: Optional[Dict]
 
         >>> Algorithm.verify({"a": "b"})
         False
         >>> Algorithm.verify({"image": "", "instance": ""})
         True
-
-        Furthermore, an additional key "hyperparameters" needs to
-        be of type dict if hyperparameters exists in the data.
-        >>> Algorithm.verify({"image": "", "instance": "", "hyperparameters": {}})
-        True
         >>> Algorithm.verify({"image": "", "instance": "", "hyperparameters": ""})
         False
+        >>> Algorithm.verify({"image": "", "instance": "", "hyperparameters": {}})
+        True
         """
         return (
             isinstance(data, dict)
@@ -474,8 +529,7 @@ class Dataset(Node):
     """
     The `Dataset` class represents a single dataset in a config file.
     The class contains rules for identifying if an object has the
-    correct structure to be a `Dataset` as well as logic for
-    multiplication and addition.
+    correct structure to be a `Dataset`, see the `verify` method.
 
     Two `Dataset` objects can be added together to form a
     `Datasets` object.
@@ -490,7 +544,7 @@ class Dataset(Node):
     >>> dataset * Algorithm({"image": "", "instance": ""})
     Experiments([Experiment({'algorithm': Algorithm({'image': '', 'instance': ''}), 'dataset': Dataset({'path': {}})})])
 
-    A `Dataset` can also be multiplied with a `Algorithms` object in order to
+    A `Dataset` can also be multiplied with an `Algorithms` object in order to
     form several `Experiment` objects at once.
 
     >>> dataset * Algorithms(
@@ -511,10 +565,20 @@ class Dataset(Node):
     ...     ]
     ... )
     True
+
+    Upon instantiating a `Dataset` object the `Dataset.verify` method checks
+    that the parameter has the correct structure. If it does not, a TypeError
+    is raised.
+
+    >>> Dataset({"a": 1})
+    Traceback (most recent call last):
+        ...
+    TypeError
+    >>> Dataset({"path": {}})
+    Dataset({'path': {}})
     """
 
-    # set that Datasets should be generated when
-    # adding two Dataset objects
+    # __add__ should return a Datasets object
     result_type = Datasets
 
     def __init__(self, *args, **kwargs):
@@ -524,6 +588,14 @@ class Dataset(Node):
 
     @classmethod
     def verify(cls, data: dict) -> bool:
+        """
+        Determines if the data parameter has the structure needed
+        to be a `Dataset`. An Algorithm is defined as being a
+        dictionary with atleast the following key-value pairs:
+
+        - path: Dict
+        - meta: Optional[Dict]
+        """
         return (
             isinstance(data, dict)
             and isinstance(data.get("path", None), dict)
@@ -533,12 +605,11 @@ class Dataset(Node):
 
 class Experiment(Node):
     """
-    The Experiment class represents a combination of an
-    algorithm that is to be run on a dataset. This class
-    verifies that the parameters passed to it upon
-    instantiation could be parsed be an Algorithm and a Dataset.
+    The Experiment class represents an `Algorithm`, `Dataset` combination.
+    The class contains rules for identifying if an object has the
+    correct structure to be an `Experiment`, see the `verify` method.
 
-    Two experiments can be added to form a `Experiments` object.
+    Two experiments can be added to form an `Experiments` object.
 
     >>> experiment = Experiment(
     ...     Algorithm({"image": "", "instance": ""}),
@@ -546,10 +617,25 @@ class Experiment(Node):
     ... )
     >>> type(experiment + experiment)
     <class 'runtool.datatypes.Experiments'>
+
+    Upon instantiating a `Experiment` object the `Experiment.verify` method checks
+    that the parameter has the correct structure. If it does not, a TypeError
+    is raised.
+
+    >>> Experiment({"a": 1}, "")
+    Traceback (most recent call last):
+        ...
+    TypeError: An Experiment requires a Dataset and an Algorithm, got: <class 'dict'> and <class 'str'>
+
+    >>> Experiment(
+    ...     Algorithm({"image": "", "instance": ""}),
+    ...     Dataset({"path": {}}),
+    ... )
+    Experiment({'algorithm': Algorithm({'image': '', 'instance': ''}), 'dataset': Dataset({'path': {}})})
+
     """
 
-    # set that Experiments should be generated when
-    # adding two Experiment objects
+    # __add__ should return an Experiments object
     result_type = Experiments
 
     def __init__(
@@ -569,12 +655,19 @@ class Experiment(Node):
 
         if not Experiment.verify(self):
             raise TypeError(
-                "An Experiment requires a Dataset and an Algorithm, got:"
+                "An Experiment requires a Dataset and an Algorithm, got: "
                 f"{type(node_1)} and {type(node_2)}"
             )
 
     @classmethod
     def verify(cls, data: dict) -> bool:
+        """
+        Any dict with the following structure is a valid Experiment object
+        {
+            "algorithm": Algorithm,
+            "dataset": Dataset
+        }
+        """
         return Algorithm.verify(data["algorithm"]) and Dataset.verify(
             data["dataset"]
         )
