@@ -7,7 +7,7 @@ from runtool.datatypes import (
     Experiments,
 )
 from typing import Any
-from runtool import load_config
+from runtool.runtool import transform_config
 
 DATASET = {
     "path": {
@@ -27,7 +27,7 @@ ALGORITHM = {
 
 
 def compare(source: dict, expected: Any):
-    assert load_config(source) == expected
+    assert transform_config(source) == expected
 
 
 def test_experiment_identification():

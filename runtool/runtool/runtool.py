@@ -1,6 +1,6 @@
 from functools import singledispatch
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Union
 
 import yaml
 
@@ -56,40 +56,20 @@ def generate_versions(data: Iterable[dict]) -> dict:
     return result
 
 
-@singledispatch
-def load_config(_):
+def load_config(path: Union[str, Path]) -> DotDict:
     """
-    The load_config singledispatch function loads a config.yml file into a DotDict.
-    This function is overloaded such that it can load a config either from a str,
-    pathlib.Path object or from a dictionary.
+    Loads a yaml file from the provided path and calls converts it
+    to a dictionary and then calls `transform_config` on the data.
     """
-    raise TypeError(
-        "load_config takes either a dict or a path to a config.yml file."
-    )
+    path = Path(path)
+    with path.open() as config:
+        return transform_config(yaml.safe_load(config))
 
 
-@load_config.register
-def load_config_str(path: str) -> DotDict:
-    """
-    Converts the passed data to a pathlib.Path object and recursivelly calls load_config.
-    """
-    return load_config(Path(path))
-
-
-@load_config.register
-def load_config_path(path: Path) -> DotDict:
-    """
-    Loads a config file from a `pathlib.Path` and recursively calls `load_config` on the loaded data.
-    """
-    with path.open() as file:
-        return load_config(yaml.safe_load(file))
-
-
-@load_config.register
-def load_config_dict(config: dict) -> DotDict:
+def transform_config(config: dict) -> DotDict:
     """
     This function applies a series of transformations to a runtool config
-    before converting it into a DotDict. The config is transformed using
+    before converting it into a DotDict. The config is transformed through
     the following procedure:
 
     First, the config will have any $ statements such as $each or $eval
