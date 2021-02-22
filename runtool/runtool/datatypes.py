@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, List, Union, Iterable
+from typing import Any, List, Optional, Type, Union, Iterable
 
 
 class DotDict(dict):
@@ -205,12 +205,14 @@ class Experiments(ListNode):
         )
 
     @classmethod
-    def verify(cls, data: dict) -> bool:
+    def verify(cls, data: Iterable) -> bool:
         """
         Check if the data has the correct structure to instantiate an
         experiment. Any iterable containing valid `Experiment` objects
         are valid `Experiments` object.
         """
+        if not data:
+            return False
         return all(map(Experiment.verify, data))
 
     __mul__ = None  # Experiments cannot be multiplied
@@ -622,10 +624,10 @@ class Experiment(Node):
     that the parameter has the correct structure. If it does not, a TypeError
     is raised.
 
-    >>> Experiment({"a": 1}, "")
+    >>> Experiment({"a": 1}, "smth")
     Traceback (most recent call last):
         ...
-    TypeError: An Experiment requires a Dataset and an Algorithm, got: <class 'dict'> and <class 'str'>
+    TypeError: An Experiment requires one Dataset and one Algorithm, got: {'a': 1} and smth
 
     >>> Experiment(
     ...     Algorithm({"image": "", "instance": ""}),
@@ -638,25 +640,39 @@ class Experiment(Node):
     # __add__ should return an Experiments object
     result_type = Experiments
 
-    def __init__(
-        self,
-        node_1: Union[Algorithm, Dataset],
-        node_2: Union[Algorithm, Dataset],
-    ):
-        def extract(desired_type):
-            if isinstance(node_1, desired_type):
-                return node_1
-            elif isinstance(node_2, desired_type):
-                return node_2
-            return None
+    def __init__(self, node: dict, node_2: Optional[dict] = None):
+        # If passing two nodes, figure out which is an algorithm
+        # and which is a dataset and generate a new Experiment
+        # object from it.
+        if node_2 is not None:
+            node = Experiment.from_nodes(node, node_2)
 
-        self["algorithm"] = extract(Algorithm)
-        self["dataset"] = extract(Dataset)
-
-        if not Experiment.verify(self):
+        # If passing one node, make sure it is a valid Experiment node
+        elif not Experiment.verify(node):
             raise TypeError(
-                "An Experiment requires a Dataset and an Algorithm, got: "
-                f"{type(node_1)} and {type(node_2)}"
+                "An Experiment requires a dict containing a valid "
+                f"Dataset and an Algorithm, got: {node}"
+            )
+        self.update(node)
+
+    @classmethod
+    def from_nodes(cls, node_1: dict, node_2: dict) -> "Experiment":
+        """
+        Given two dictionaries tries to generate an Experiment object.
+        If not exactly one node is a valid Dataset and one exactly node
+        is a valid Algorithm this raises a TypeError.
+        """
+        try:
+            return cls({"algorithm": node_1, "dataset": node_2})
+        except TypeError:
+            pass
+
+        try:
+            return cls({"algorithm": node_2, "dataset": node_1})
+        except TypeError:
+            raise TypeError(
+                "An Experiment requires one Dataset and one Algorithm, got: "
+                f"{node_1} and {node_2}"
             )
 
     @classmethod
@@ -668,8 +684,10 @@ class Experiment(Node):
             "dataset": Dataset
         }
         """
-        return Algorithm.verify(data["algorithm"]) and Dataset.verify(
-            data["dataset"]
+        return (
+            isinstance(data, dict)
+            and Algorithm.verify(data.get("algorithm", None))
+            and Dataset.verify(data.get("dataset", None))
         )
 
     __mul__ = None  # An Experiment cannot be multiplied
