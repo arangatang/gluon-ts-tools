@@ -211,8 +211,9 @@ class Experiments(ListNode):
         experiment. Any iterable containing valid `Experiment` objects
         are valid `Experiments` object.
         """
-        if not data:
+        if not data or not isinstance(data, Iterable):
             return False
+
         return all(map(Experiment.verify, data))
 
     __mul__ = None  # Experiments cannot be multiplied
@@ -296,7 +297,7 @@ class Datasets(ListNode):
         Any non empty iterable with valid `Dataset`
         objects is a valid `Datasets` object.
         """
-        if not data:
+        if not data or not isinstance(data, Iterable):
             return False
 
         return all(map(Dataset.verify, data))
@@ -380,8 +381,9 @@ class Algorithms(ListNode):
         Any non empty iterable containing valid `Algorithm`
         objects is a valid `Algorithms` object.
         """
-        if not data:
+        if not data or not isinstance(data, Iterable):
             return False
+
         return all(map(Algorithm.verify, data))
 
 

@@ -10,10 +10,10 @@ from runtool.recurse_config import Versions
 from runtool.transformer import apply_transformations
 
 
-def generate_versions(data: Iterable) -> dict:
+def generate_versions(data: Iterable[dict]) -> dict:
     """
-    Converts a list of dictionaries to a single dictionary.
-    If two dictionaries has the same values, these values are stored in
+    Converts an Iterable collection of dictionaries to a single dictionary.
+    If two dictionaries have the same values, these values are stored in
     a `runtool.datatypes.Versions` object.
 
     example:
@@ -25,20 +25,35 @@ def generate_versions(data: Iterable) -> dict:
     ...     ]
     ... )
     {'a': Versions([1, 2]), 'b': 3}
+
+
+    >>> generate_versions([{"a": 1}])
+    {'a': 1}
+
+    >>> generate_versions([{"a": 1}, {"a": 2}])
+    {'a': Versions([1, 2])}
+
+    >>> generate_versions([{"a": 1}, {"a": 2}, {"a": 3}])
+    {'a': Versions([1, 2, 3])}
     """
-    base = {}
-    for item in data:
-        for key, value in item.items():
-            if key not in base:
+
+    result = {}
+    for dct in data:
+        for key, value in dct.items():
+            if key not in result:
                 # first time a value occurs, store it
-                base[key] = value
-            elif not isinstance(base[key], Versions) and base[key] != value:
-                # If multiple values with the same keys exists
-                # merge these into a Versions object
-                base[key] = Versions([base[key], value])
-            elif not value in base[key]:  # only store unique values
-                base[key].append(value)
-    return base
+                result[key] = value
+            elif (
+                not isinstance(result[key], Versions) and result[key] != value
+            ):
+                # second time a value occurs for the same key
+                # store these values into a Versions object
+                result[key] = Versions([result[key], value])
+            elif value not in result[key]:
+                # if a key occurs with unique values 2+ times append
+                # the value to the previously created Versions object
+                result[key].append(value)
+    return result
 
 
 @singledispatch

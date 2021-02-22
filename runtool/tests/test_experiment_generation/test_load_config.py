@@ -70,3 +70,24 @@ def test_datasets_identification():
         {"ds": [DATASET]},
         {"ds": Datasets([Dataset(DATASET)])},
     )
+
+
+def test_all_in_one():
+    compare(
+        {
+            "dataset": DATASET,
+            "datasets": [DATASET],
+            "algorithm": ALGORITHM,
+            "algorithms": [ALGORITHM],
+            "experiment": {"algorithm": ALGORITHM, "dataset": DATASET},
+            "experiments": [{"algorithm": ALGORITHM, "dataset": DATASET}],
+        },
+        {
+            "dataset": Dataset(DATASET),
+            "datasets": Datasets([Dataset(DATASET)]),
+            "algorithm": Algorithm(ALGORITHM),
+            "algorithms": Algorithms([Algorithm(ALGORITHM)]),
+            "experiment": Experiment(ALGORITHM, DATASET),
+            "experiments": Experiments([Experiment(ALGORITHM, DATASET)]),
+        },
+    )
