@@ -50,7 +50,7 @@ def generate_versions(data: Iterable[dict]) -> dict:
                 # store these values into a Versions object
                 result[key] = Versions([result[key], value])
             elif value not in result[key]:
-                # if a key occurs with unique values 2+ times append
+                # if a key occurs with unique values 3+ times append
                 # the value to the previously created Versions object
                 result[key].append(value)
     return result
