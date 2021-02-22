@@ -1,13 +1,51 @@
 from functools import singledispatch
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Union
+from datetime import datetime
 
 import yaml
+import boto3
 
-from runtool.datatypes import DotDict, Algorithm
+from runtool.datatypes import DotDict, Algorithm, Experiment, Experiments
 from runtool.infer_types import infer_types
 from runtool.recurse_config import Versions
 from runtool.transformer import apply_transformations
+from runtool.dispatcher import JobsDispatcher
+from runtool.experiments_converter import generate_sagemaker_json
+
+
+class Client:
+    def __init__(
+        self, role: str, bucket: str, session: boto3.Session = boto3.Session()
+    ) -> None:
+        self.role = role
+        self.bucket = bucket
+        self.session = session
+        self.dispatcher = JobsDispatcher(session)
+
+    def run(
+        self,
+        experiment: Union[Experiments, Experiment],
+        experiment_name: str = "default experiment name",
+        runs: int = 1,
+        job_name_expression: str = None,
+        tags: dict = {},
+    ):
+        json_stream = generate_sagemaker_json(
+            experiment,
+            runs=runs,
+            experiment_name=experiment_name,
+            job_name_expression=job_name_expression,
+            tags=tags,
+            creation_time=datetime.utcnow().strftime("%Y-%m-%d-%H-%M-%S"),
+            bucket=self.bucket,
+            role=self.role,
+        )
+        tmp = list(json_stream)
+        print(tmp)
+        print(len(tmp))
+        # self.dispatcher.dispatch(json_stream)
+        raise NotImplementedError
 
 
 def generate_versions(data: Iterable) -> dict:
