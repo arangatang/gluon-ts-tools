@@ -1,6 +1,6 @@
-from functools import singledispatch
 import itertools
-from typing import Callable, Any
+from functools import singledispatch
+from typing import Any, Callable
 
 
 class Versions:

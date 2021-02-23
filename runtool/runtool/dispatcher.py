@@ -1,4 +1,5 @@
 from typing import Iterable
+
 import boto3
 
 

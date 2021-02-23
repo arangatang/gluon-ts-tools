@@ -1,5 +1,4 @@
-from functools import partial
-from typing import Any, List, Optional, Type, Union, Iterable
+from typing import Any, Iterable, List, Optional, Union
 
 
 class DotDict(dict):

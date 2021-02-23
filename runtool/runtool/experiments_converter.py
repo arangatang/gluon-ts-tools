@@ -7,11 +7,7 @@ from typing import DefaultDict, Iterable, Optional
 
 from pydantic import BaseModel
 
-from runtool.datatypes import (
-    DotDict,
-    Experiment,
-    Experiments,
-)
+from runtool.datatypes import DotDict, Experiment, Experiments
 from runtool.recurse_config import recursive_apply
 from runtool.transformations import apply_trial
 from runtool.utils import update_nested_dict

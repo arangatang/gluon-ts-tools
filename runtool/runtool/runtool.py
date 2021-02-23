@@ -1,5 +1,4 @@
 from datetime import datetime
-from functools import singledispatch
 from pathlib import Path
 from typing import Any, Iterable, Union
 
