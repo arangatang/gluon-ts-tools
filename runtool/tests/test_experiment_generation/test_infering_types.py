@@ -1,7 +1,7 @@
 from runtool.datatypes import Dataset, Algorithm, Algorithms, Datasets
 import yaml
 from typing import Union
-from runtool.infer_types import infer_type
+from runtool.runtool import infer_type
 
 ALGORITHM = {
     "image": "012345678901.dkr.ecr.eu-west-1.amazonaws.com/gluonts/cpu:latest",
