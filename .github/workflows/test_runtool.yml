@@ -27,4 +27,4 @@ jobs:
         pip install -e ./runtool
     - name: Test with pytest
       run: |
-        pytest -e ./runtool -vv
+        pytest ./runtool -vv
