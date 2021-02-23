@@ -3,13 +3,11 @@ from datetime import datetime
 from functools import partial, singledispatch
 from hashlib import sha1
 from itertools import chain
-from typing import DefaultDict, Iterable, Optional, Union
+from typing import DefaultDict, Iterable, Optional
 
 from pydantic import BaseModel
 
 from runtool.datatypes import (
-    Algorithm,
-    Dataset,
     DotDict,
     Experiment,
     Experiments,
@@ -27,8 +25,6 @@ def hash(data):
 
 
 class ExperimentConverter(BaseModel):
-    algorithm: dict
-    dataset: dict
     experiment: dict
     tags: dict
     runs: int
@@ -40,8 +36,8 @@ class ExperimentConverter(BaseModel):
     job_name_expression: Optional[str]
 
     def generate_tags(self, run_configuration: str) -> list:
-        tags = self.algorithm.get("tags", {})
-        tags.update(self.dataset.get("tags", {}))
+        tags = self.experiment["algorithm"].get("tags", {})
+        tags.update(self.experiment["dataset"].get("tags", {}))
         tags.update(
             {
                 "run_configuration_id": run_configuration,  # identifies dataset/algorithm used
@@ -66,12 +62,15 @@ class ExperimentConverter(BaseModel):
         # below is a temporary workaround which makes the run_configuration determenistic
         trial_id = "".join(
             (
-                self.algorithm["image"],
-                self.algorithm["instance"],
-                json.dumps(self.algorithm["hyperparameters"], sort_keys=True)
-                if "hyperparameters" in self.algorithm
+                self.experiment["algorithm"]["image"],
+                self.experiment["algorithm"]["instance"],
+                json.dumps(
+                    self.experiment["algorithm"]["hyperparameters"],
+                    sort_keys=True,
+                )
+                if "hyperparameters" in self.experiment["algorithm"]
                 else "",
-                json.dumps(self.dataset, sort_keys=True),
+                json.dumps(self.experiment["dataset"], sort_keys=True),
             )
         )
         return f"{self.experiment_name}_{hash(trial_id)}"
@@ -80,8 +79,8 @@ class ExperimentConverter(BaseModel):
         return [
             {"Name": key, "Regex": value}
             for key, value in chain(
-                self.algorithm.get("metrics", {}).items(),
-                self.dataset.get("metrics", {}).items(),
+                self.experiment["algorithm"].get("metrics", {}).items(),
+                self.experiment["dataset"].get("metrics", {}).items(),
             )
         ]
 
@@ -113,7 +112,8 @@ class ExperimentConverter(BaseModel):
         sagemaker_overrides = (
             (key.lstrip("$sagemaker.").split("."), value)
             for key, value in chain(
-                self.algorithm.items(), self.dataset.items()
+                self.experiment["algorithm"].items(),
+                self.experiment["dataset"].items(),
             )
             if key.startswith("$sagemaker.")
         )
@@ -154,10 +154,10 @@ class ExperimentConverter(BaseModel):
             )
 
         # thereafter any jobnames added within the config has prio
-        elif "$job_name" in self.algorithm:
-            return self.algorithm["$job_name"]
-        elif "$job_name" in self.dataset:
-            return self.dataset["$job_name"]
+        elif "$job_name" in self.experiment["algorithm"]:
+            return self.experiment["algorithm"]["$job_name"]
+        elif "$job_name" in self.experiment["dataset"]:
+            return self.experiment["dataset"]["$job_name"]
 
         # fallback on default naming
         return (
@@ -172,7 +172,9 @@ class ExperimentConverter(BaseModel):
             key: str(
                 value
             )  # important to cast to string sagemaker to avoid sagemaker crash
-            for key, value in self.algorithm.get("hyperparameters", {}).items()
+            for key, value in self.experiment["algorithm"]
+            .get("hyperparameters", {})
+            .items()
         }
 
     def run(self) -> Iterable[dict]:
@@ -186,7 +188,7 @@ class ExperimentConverter(BaseModel):
             job_name = self.generate_job_name(run, run_configuration)
             json_ = {
                 "AlgorithmSpecification": {
-                    "TrainingImage": self.algorithm["image"],
+                    "TrainingImage": self.experiment["algorithm"]["image"],
                     "TrainingInputMode": "File",
                     "MetricDefinitions": metrics,
                 },
@@ -203,14 +205,14 @@ class ExperimentConverter(BaseModel):
                             }
                         },
                     }
-                    for name, uri in self.dataset["path"].items()
+                    for name, uri in self.experiment["dataset"]["path"].items()
                 ],
                 "OutputDataConfig": {
                     "S3OutputPath": f"s3://{self.bucket}/{self.experiment_name}/{run_configuration}"
                 },
                 "ResourceConfig": {
                     "InstanceCount": 1,
-                    "InstanceType": self.algorithm["instance"],
+                    "InstanceType": self.experiment["algorithm"]["instance"],
                     "VolumeSizeInGB": 32,
                 },
                 "StoppingCondition": {"MaxRuntimeInSeconds": 86400},
@@ -247,8 +249,6 @@ def generate_sagemaker_json(
 
     # generate jsons for calling the sagemaker api
     converter = ExperimentConverter(
-        algorithm=experiment.algorithm,
-        dataset=experiment.dataset,
         experiment=experiment,
         runs=runs,
         experiment_name=experiment_name,
