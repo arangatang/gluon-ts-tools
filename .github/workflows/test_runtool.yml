@@ -1,0 +1,30 @@
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    strategy:
+      max-parallel: 4
+      fail-fast: false
+      matrix:
+        python-version: [3.6, 3.7]
+        platform: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install pip==20.2
+        pip install pytest
+        pip install -e ./runtool
+    - name: Test with pytest
+      run: |
+        pytest -e ./runtool -vv
