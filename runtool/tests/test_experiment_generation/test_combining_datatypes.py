@@ -29,9 +29,9 @@ DATASET = Dataset(
 )
 
 EXPERIMENT = Experiment(ALGORITHM, DATASET)
-ALGORITHMS = lambda num: Algorithms([ALGORITHM for _ in range(num)])
-DATASETS = lambda num: Datasets([DATASET for _ in range(num)])
-EXPERIMENTS = lambda num: Experiments([EXPERIMENT for _ in range(num)])
+ALGORITHMS = lambda num: Algorithms([ALGORITHM] * num)
+DATASETS = lambda num: Datasets([DATASET] * num)
+EXPERIMENTS = lambda num: Experiments([EXPERIMENT] * num)
 
 
 def perform_typeerror_test(data, to_multiply):

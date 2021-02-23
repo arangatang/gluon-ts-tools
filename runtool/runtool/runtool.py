@@ -1,17 +1,25 @@
+from datetime import datetime
 from functools import singledispatch
 from pathlib import Path
-from typing import Iterable, Union
-from datetime import datetime
+from typing import Any, Iterable, Union
 
-import yaml
 import boto3
+import yaml
+from toolz import valmap
 
-from runtool.datatypes import DotDict, Algorithm, Experiment, Experiments
-from runtool.infer_types import infer_types
-from runtool.recurse_config import Versions
-from runtool.transformer import apply_transformations
+from runtool.datatypes import (
+    Algorithm,
+    Algorithms,
+    Dataset,
+    Datasets,
+    DotDict,
+    Experiment,
+    Experiments,
+)
 from runtool.dispatcher import JobsDispatcher
 from runtool.experiments_converter import generate_sagemaker_json
+from runtool.recurse_config import Versions
+from runtool.transformer import apply_transformations
 
 
 class Client:
@@ -48,10 +56,96 @@ class Client:
         raise NotImplementedError
 
 
-def generate_versions(data: Iterable) -> dict:
+def infer_type(node: Union[list, dict]) -> Any:
     """
-    Converts a list of dictionaries to a single dictionary.
-    If two dictionaries has the same values, these values are stored in
+    infer_type converts a list or a dict into an instance
+    of one of the following classes.
+
+    - Algorithm
+    - Algorithms
+    - Dataset
+    - Datasets
+    - Experiment
+    - Experiments
+
+    All these classes has a "verify" method implemented.
+    The "verify" method will be called with the node as parameter
+    for each class in sequence.
+    If "verify" returns True, the node is converted
+    to an instance of that class.
+
+    Example:
+    >>> algorithm = {
+    ...     "image": "image_name",
+    ...     "instance": "ml.m5.2xlarge",
+    ...     "hyperparameters": {},
+    ... }
+    >>> dataset = {
+    ...     "path": {
+    ...         "train": "some path"
+    ...     },
+    ...     "meta": {},
+    ... }
+
+    >>> isinstance(infer_type(algorithm), Algorithm)
+    True
+
+    >>> isinstance(infer_type([algorithm]), Algorithms)
+    True
+
+    >>> isinstance(infer_type(dataset), Dataset)
+    True
+
+    >>> isinstance(infer_type([dataset]), Datasets)
+    True
+
+    >>> experiment = {"dataset": dataset, "algorithm": algorithm}
+    >>> isinstance(infer_type(experiment), Experiment)
+    True
+
+    >>> isinstance(infer_type([experiment]), Experiments)
+    True
+
+    If the node matches multiple classes, the first match will be returned.
+    An example of this is when a dictionary contains both a valid algorithm
+    and a valid dataset. See below example.
+
+    >>> isinstance(infer_type(dict(**algorithm, **dataset)), Algorithm)
+    True
+
+    For those cases where no class can verify the node,
+    the node is returned.
+    >>> isinstance(infer_type({}), dict)
+    True
+
+    >>> isinstance(infer_type([]), list)
+    True
+
+    >>> isinstance(infer_type([algorithm, dataset]), list)
+    True
+
+    """
+    for class_ in (
+        Algorithm,
+        Algorithms,
+        Dataset,
+        Datasets,
+        Experiment,
+        Experiments,
+    ):
+        if class_.verify(node):
+            return class_(node)
+    return node
+
+
+def infer_types(data: dict) -> dict:
+    return valmap(infer_type, data)
+
+
+def generate_versions(data: Iterable[dict]) -> dict:
+    """
+    Converts an Iterable collection of dictionaries to a single dictionary.
+    If two dictionaries have the same values, these values are stored in
     a `runtool.datatypes.Versions` object.
 
     example:
@@ -63,56 +157,51 @@ def generate_versions(data: Iterable) -> dict:
     ...     ]
     ... )
     {'a': Versions([1, 2]), 'b': 3}
+
+
+    >>> generate_versions([{"a": 1}])
+    {'a': 1}
+
+    >>> generate_versions([{"a": 1}, {"a": 2}])
+    {'a': Versions([1, 2])}
+
+    >>> generate_versions([{"a": 1}, {"a": 2}, {"a": 3}])
+    {'a': Versions([1, 2, 3])}
     """
-    base = {}
-    for item in data:
-        for key, value in item.items():
-            if key not in base:
+
+    result = {}
+    for dct in data:
+        for key, value in dct.items():
+            if key not in result:
                 # first time a value occurs, store it
-                base[key] = value
-            elif not isinstance(base[key], Versions) and base[key] != value:
-                # If multiple values with the same keys exists
-                # merge these into a Versions object
-                base[key] = Versions([base[key], value])
-            elif not value in base[key]:  # only store unique values
-                base[key].append(value)
-    return base
+                result[key] = value
+            elif (
+                not isinstance(result[key], Versions) and result[key] != value
+            ):
+                # second time a value occurs for the same key
+                # store these values into a Versions object
+                result[key] = Versions([result[key], value])
+            elif value not in result[key]:
+                # if a key occurs with unique values 3+ times append
+                # the value to the previously created Versions object
+                result[key].append(value)
+    return result
 
 
-@singledispatch
-def load_config(_):
+def load_config(path: Union[str, Path]) -> DotDict:
     """
-    The load_config singledispatch function loads a config.yml file into a DotDict.
-    This function is overloaded such that it can load a config either from a str,
-    pathlib.Path object or from a dictionary.
+    Loads a yaml file from the provided path and calls converts it
+    to a dictionary and then calls `transform_config` on the data.
     """
-    raise TypeError(
-        "load_config takes either a dict or a path to a config.yml file."
-    )
+    path = Path(path)
+    with path.open() as config:
+        return transform_config(yaml.safe_load(config))
 
 
-@load_config.register
-def load_config_str(path: str) -> DotDict:
-    """
-    Converts the passed data to a pathlib.Path object and recursivelly calls load_config.
-    """
-    return load_config(Path(path))
-
-
-@load_config.register
-def load_config_path(path: Path) -> DotDict:
-    """
-    Loads a config file from a `pathlib.Path` and recursively calls `load_config` on the loaded data.
-    """
-    with path.open() as file:
-        return load_config(yaml.safe_load(file))
-
-
-@load_config.register
-def load_config_dict(config: dict) -> DotDict:
+def transform_config(config: dict) -> DotDict:
     """
     This function applies a series of transformations to a runtool config
-    before converting it into a DotDict. The config is transformed using
+    before converting it into a DotDict. The config is transformed through
     the following procedure:
 
     First, the config will have any $ statements such as $each or $eval

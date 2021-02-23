@@ -43,6 +43,9 @@ class Versions:
 
         return True
 
+    def append(self, data: Any):
+        self.__root__.append(data)
+
 
 @singledispatch
 def recursive_apply(node, fn: Callable) -> Any:
