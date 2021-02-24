@@ -48,11 +48,7 @@ class Client:
             bucket=self.bucket,
             role=self.role,
         )
-        tmp = list(json_stream)
-        print(tmp)
-        print(len(tmp))
-        # self.dispatcher.dispatch(json_stream)
-        raise NotImplementedError
+        return self.dispatcher.dispatch(json_stream)
 
 
 def infer_type(node: Union[list, dict]) -> Any:
