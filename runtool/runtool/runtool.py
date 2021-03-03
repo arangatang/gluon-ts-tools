@@ -1,6 +1,8 @@
+from collections import defaultdict
 from datetime import datetime
+from functools import singledispatch
 from pathlib import Path
-from typing import Any, Iterable, Union
+from typing import Any, Dict, Iterable, Union
 
 import boto3
 import yaml
@@ -51,23 +53,78 @@ class Client:
         return self.dispatcher.dispatch(json_stream)
 
 
-def infer_type(node: Union[list, dict]) -> Any:
+@singledispatch
+def infer_type(node):
     """
-    infer_type converts a list or a dict into an instance
+    Basecase for infer_type, Any node which is not handled by
+    another singledispatch function should be returned unaltered.
+    """
+    return node
+
+
+@infer_type.register
+def infer_type_list(
+    node: list,
+) -> Union[Algorithms, Datasets, Experiments, list]:
+    """
+    infer_type_list converts a list into an instance
+    of one of the following classes.
+
+    - Algorithms
+    - Datasets
+    - Experiments
+
+    Example:
+
+    >>> algorithm = {
+    ...     "image": "image_name",
+    ...     "instance": "ml.m5.2xlarge",
+    ...     "hyperparameters": {},
+    ... }
+    >>> isinstance(infer_type([algorithm]), Algorithms)
+    True
+
+    >>> dataset = {
+    ...     "path": {
+    ...         "train": "some path"
+    ...     },
+    ...     "meta": {},
+    ... }
+    >>> isinstance(infer_type([dataset]), Datasets)
+    True
+
+    >>> experiment = {
+    ...     "dataset": dataset,
+    ...     "algorithm": algorithm,
+    ... }
+    >>> isinstance(infer_type([experiment]), Experiments)
+    True
+
+    If the node does not match the structure required for either
+    Algorithms, Datasets or Experiments, the node is returned unaltered.
+
+    >>> infer_type([]) == []
+    True
+
+    >>> infer_type([algorithm, dataset]) == [algorithm, dataset]
+    True
+
+    """
+    for class_ in (Algorithms, Datasets, Experiments):
+        if class_.verify(node):
+            return class_(node)
+    return node
+
+
+@infer_type.register
+def infer_type_dict(node: dict) -> Union[Algorithm, Dataset, Experiment, dict]:
+    """
+    infer_type_dict converts a dict into an instance
     of one of the following classes.
 
     - Algorithm
-    - Algorithms
     - Dataset
-    - Datasets
     - Experiment
-    - Experiments
-
-    All these classes has a "verify" method implemented.
-    The "verify" method will be called with the node as parameter
-    for each class in sequence.
-    If "verify" returns True, the node is converted
-    to an instance of that class.
 
     Example:
     >>> algorithm = {
@@ -75,30 +132,23 @@ def infer_type(node: Union[list, dict]) -> Any:
     ...     "instance": "ml.m5.2xlarge",
     ...     "hyperparameters": {},
     ... }
+    >>> isinstance(infer_type(algorithm), Algorithm)
+    True
+
     >>> dataset = {
     ...     "path": {
     ...         "train": "some path"
     ...     },
     ...     "meta": {},
     ... }
-
-    >>> isinstance(infer_type(algorithm), Algorithm)
-    True
-
-    >>> isinstance(infer_type([algorithm]), Algorithms)
-    True
-
     >>> isinstance(infer_type(dataset), Dataset)
     True
 
-    >>> isinstance(infer_type([dataset]), Datasets)
-    True
-
-    >>> experiment = {"dataset": dataset, "algorithm": algorithm}
+    >>> experiment = {
+    ...     "dataset": dataset,
+    ...     "algorithm": algorithm,
+    ... }
     >>> isinstance(infer_type(experiment), Experiment)
-    True
-
-    >>> isinstance(infer_type([experiment]), Experiments)
     True
 
     If the node matches multiple classes, the first match will be returned.
@@ -108,26 +158,12 @@ def infer_type(node: Union[list, dict]) -> Any:
     >>> isinstance(infer_type(dict(**algorithm, **dataset)), Algorithm)
     True
 
-    For those cases where no class can verify the node,
-    the node is returned.
-    >>> isinstance(infer_type({}), dict)
+    If the node does not match the structure required for either
+    Algorithm, Dataset or Experiment, the node is returned unaltered.
+    >>> infer_type({}) == {}
     True
-
-    >>> isinstance(infer_type([]), list)
-    True
-
-    >>> isinstance(infer_type([algorithm, dataset]), list)
-    True
-
     """
-    for class_ in (
-        Algorithm,
-        Algorithms,
-        Dataset,
-        Datasets,
-        Experiment,
-        Experiments,
-    ):
+    for class_ in (Algorithm, Dataset, Experiment):
         if class_.verify(node):
             return class_(node)
     return node
@@ -137,13 +173,20 @@ def infer_types(data: dict) -> dict:
     return valmap(infer_type, data)
 
 
-def generate_versions(data: Iterable[dict]) -> dict:
+def generate_versions(data: Iterable[dict]) -> Dict[Any, Versions]:
     """
-    Converts an Iterable collection of dictionaries to a single dictionary.
-    If two dictionaries have the same values, these values are stored in
-    a `runtool.datatypes.Versions` object.
+    Converts an Iterable collection of dictionaries to a single dictionary
+    where each value is a `runtool.datatypes.Versions` object.
+    If two dictionaries has the same keys, their values are appended to the
+    `Versions` object.
 
     example:
+
+    >>> generate_versions([{"a": 1}])
+    {'a': 1}
+
+    >>> generate_versions([{"a": 1}, {"a": 2}])
+    {'a': Versions([1, 2])}
 
     >>> generate_versions(
     ...     [
@@ -152,35 +195,15 @@ def generate_versions(data: Iterable[dict]) -> dict:
     ...     ]
     ... )
     {'a': Versions([1, 2]), 'b': 3}
-
-
-    >>> generate_versions([{"a": 1}])
-    {'a': 1}
-
-    >>> generate_versions([{"a": 1}, {"a": 2}])
-    {'a': Versions([1, 2])}
-
-    >>> generate_versions([{"a": 1}, {"a": 2}, {"a": 3}])
-    {'a': Versions([1, 2, 3])}
     """
 
-    result = {}
+    # creates a new Versions object for any new keys and appends
+    # the value to the created Versions object
+    result = defaultdict(Versions)
     for dct in data:
         for key, value in dct.items():
-            if key not in result:
-                # first time a value occurs, store it
-                result[key] = value
-            elif (
-                not isinstance(result[key], Versions) and result[key] != value
-            ):
-                # second time a value occurs for the same key
-                # store these values into a Versions object
-                result[key] = Versions([result[key], value])
-            elif value not in result[key]:
-                # if a key occurs with unique values 3+ times append
-                # the value to the previously created Versions object
-                result[key].append(value)
-    return result
+            result[key].append(value)
+    return dict(result)
 
 
 def load_config(path: Union[str, Path]) -> DotDict:
@@ -188,9 +211,8 @@ def load_config(path: Union[str, Path]) -> DotDict:
     Loads a yaml file from the provided path and calls converts it
     to a dictionary and then calls `transform_config` on the data.
     """
-    path = Path(path)
-    with path.open() as config:
-        return transform_config(yaml.safe_load(config))
+    with open(path) as config_file:
+        return transform_config(yaml.safe_load(config_file))
 
 
 def transform_config(config: dict) -> DotDict:
@@ -246,7 +268,5 @@ def transform_config(config: dict) -> DotDict:
     Finally, the dict is converted to a DotDict and returned.
     """
     return DotDict(
-        generate_versions(
-            infer_types(item) for item in apply_transformations(config)
-        )
+        generate_versions(map(infer_types, apply_transformations(config)))
     )

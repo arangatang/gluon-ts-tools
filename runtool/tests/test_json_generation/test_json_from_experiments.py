@@ -23,7 +23,7 @@ DATASET = Dataset(
     }
 )
 
-EXPERIMENT = Experiment(ALGORITHM, DATASET)
+EXPERIMENT = Experiment.from_nodes(ALGORITHM, DATASET)
 
 
 def compare(

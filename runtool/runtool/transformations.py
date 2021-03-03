@@ -6,6 +6,7 @@ from uuid import uuid4
 from runtool.datatypes import DotDict
 from runtool.recurse_config import Versions, recursive_apply
 from runtool.utils import get_item_from_path, update_nested_dict
+from collections import UserDict
 
 
 def apply_from(node: dict, context: dict) -> dict:
@@ -278,7 +279,7 @@ def apply_trial(node: dict, locals: dict) -> Any:
     Any
         The transformed node.
     """
-    if not (isinstance(node, dict) and "$eval" in node):
+    if not (isinstance(node, (dict, UserDict)) and "$eval" in node):
         return node
 
     assert len(node) == 1, "$eval needs to be only value"
@@ -330,16 +331,16 @@ def apply_each(node: dict) -> Versions:
     If dictionaries are passed to $each, these will be updated with the
     value of the passed `node` before a Versions object is generated.
 
-    >>> apply_each({"a": 1, "$each": [{"b": 2}]})
-    Versions([{'b': 2, 'a': 1}])
+    >>> apply_each({"a": 1, "$each": [{"b": 2}, {"b": 3}]})
+    Versions([{'b': 2, 'a': 1}, {'b': 3, 'a': 1}])
 
     It is possible to have an unaltered version of the parent node by
     inserting $None into the values of $each. In the example below,
     apply_each generates two versions of the node, one which is unaltered
     and one which is merged with another dict.
 
-    >>> apply_each({"a": 1, "$each": ["$None"]})
-    Versions([{'a': 1}])
+    >>> apply_each({"a": 1, "$each": ["$None", {"b": 2}]})
+    Versions([{'a': 1}, {'b': 2, 'a': 1}])
 
     Below is a more complicated example combining the two examples above:
 

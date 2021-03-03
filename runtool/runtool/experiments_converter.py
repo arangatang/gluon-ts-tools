@@ -11,6 +11,7 @@ from runtool.datatypes import DotDict, Experiment, Experiments
 from runtool.recurse_config import recursive_apply
 from runtool.transformations import apply_trial
 from runtool.utils import update_nested_dict
+from toolz.dicttoolz import valmap
 
 
 def hash(data):
@@ -235,11 +236,14 @@ def generate_sagemaker_json(
     bucket: str,
     role: str,
 ) -> Iterable[dict]:
+    # recurse_config cannot handle UserDict and UserList
+    # Thus convert experiment to a normal dict
+    experiment = experiment.to_dict()
+
     # resolve $trial in experiments
     experiment = DotDict(
         recursive_apply(
-            experiment,
-            partial(apply_trial, locals={"__trial__": experiment}),
+            experiment, partial(apply_trial, locals={"__trial__": experiment})
         )
     )
 

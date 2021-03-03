@@ -1,3 +1,5 @@
+from typing import Any
+
 from runtool.datatypes import (
     Algorithm,
     Algorithms,
@@ -6,8 +8,9 @@ from runtool.datatypes import (
     Experiment,
     Experiments,
 )
-from typing import Any
+from runtool.recurse_config import Versions
 from runtool.runtool import transform_config
+from toolz.dicttoolz import valmap
 
 DATASET = {
     "path": {
@@ -25,6 +28,8 @@ ALGORITHM = {
     },
 }
 
+EXPERIMENT = Experiment({"algorithm": ALGORITHM, "dataset": DATASET})
+
 
 def compare(source: dict, expected: Any):
     assert transform_config(source) == expected
@@ -33,42 +38,42 @@ def compare(source: dict, expected: Any):
 def test_experiment_identification():
     compare(
         {"my_experiment": {"algorithm": ALGORITHM, "dataset": DATASET}},
-        {"my_experiment": Experiment(ALGORITHM, DATASET)},
+        {"my_experiment": Versions([EXPERIMENT])},
     )
 
 
 def test_experiments_identification():
     compare(
-        {"my_experiments": [{"algorithm": ALGORITHM, "dataset": DATASET}]},
-        {"my_experiments": Experiments([Experiment(ALGORITHM, DATASET)])},
+        {"my_experiments": [EXPERIMENT]},
+        {"my_experiments": Versions([Experiments([EXPERIMENT])])},
     )
 
 
 def test_algorithm_identification():
     compare(
         {"algorithm": ALGORITHM},
-        {"algorithm": Algorithm(ALGORITHM)},
+        {"algorithm": Versions([Algorithm(ALGORITHM)])},
     )
 
 
 def test_algorithms_identification():
     compare(
         {"algo": [ALGORITHM]},
-        {"algo": Algorithms([Algorithm(ALGORITHM)])},
+        {"algo": Versions([Algorithms([Algorithm(ALGORITHM)])])},
     )
 
 
 def test_dataset_identification():
     compare(
         {"ds": DATASET},
-        {"ds": Dataset(DATASET)},
+        {"ds": Versions([Dataset(DATASET)])},
     )
 
 
 def test_datasets_identification():
     compare(
         {"ds": [DATASET]},
-        {"ds": Datasets([Dataset(DATASET)])},
+        {"ds": Versions([Datasets([Dataset(DATASET)])])},
     )
 
 
@@ -83,11 +88,11 @@ def test_all_in_one():
             "experiments": [{"algorithm": ALGORITHM, "dataset": DATASET}],
         },
         {
-            "dataset": Dataset(DATASET),
-            "datasets": Datasets([Dataset(DATASET)]),
-            "algorithm": Algorithm(ALGORITHM),
-            "algorithms": Algorithms([Algorithm(ALGORITHM)]),
-            "experiment": Experiment(ALGORITHM, DATASET),
-            "experiments": Experiments([Experiment(ALGORITHM, DATASET)]),
+            "dataset": Versions([Dataset(DATASET)]),
+            "datasets": Versions([Datasets([Dataset(DATASET)])]),
+            "algorithm": Versions([Algorithm(ALGORITHM)]),
+            "algorithms": Versions([Algorithms([Algorithm(ALGORITHM)])]),
+            "experiment": Versions([EXPERIMENT]),
+            "experiments": Versions([Experiments([EXPERIMENT])]),
         },
     )

@@ -15,22 +15,24 @@ def compare(testname: str):
     of the current folder.
     """
     path = Path(__file__).parent / "test_data" / testname
-
     config = load_config(path / "source.yml")
-    experiment = config.algorithms * config.datasets
-    json = generate_sagemaker_json(
-        experiment,
-        runs=1,
-        experiment_name="dummy_name",
-        job_name_expression="'mocked_name'",
-        tags={"repeated_runs_group_id": "mocked_value"},
-        creation_time="2021-02-23-14-36-39",
-        bucket="dummy_bucket",
-        role="dummy_role",
-    )
 
     with open(path / "expected.yml") as expected:
-        assert list(json) == yaml.safe_load(expected)
+        assert (
+            list(
+                generate_sagemaker_json(
+                    config.algorithms * config.datasets,
+                    runs=1,
+                    experiment_name="dummy_name",
+                    job_name_expression="'mocked_name'",
+                    tags={"repeated_runs_group_id": "mocked_value"},
+                    creation_time="2021-02-23-14-36-39",
+                    bucket="dummy_bucket",
+                    role="dummy_role",
+                )
+            )
+            == yaml.safe_load(expected)
+        )
 
 
 def test_minimum():

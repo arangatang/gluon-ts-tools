@@ -41,7 +41,6 @@ class JobsDispatcher:
         queues = self.group_by_instance_type(runs)
         remaining_jobs = len(runs)
         responses = {}
-        timeout = 60
         retries = 0  # used for exponential backoff if throttled
 
         # overwrites the current line in the terminal

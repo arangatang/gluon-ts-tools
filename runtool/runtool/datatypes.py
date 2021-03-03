@@ -1,4 +1,6 @@
-from typing import Any, Iterable, List, Optional, Union
+from collections import UserDict, UserList
+from typing import Any, Iterable, List, Type, Union
+from toolz.dicttoolz import valmap
 
 
 class DotDict(dict):
@@ -15,8 +17,7 @@ class DotDict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
-    def __init__(self, init_data={}):
-        assert isinstance(init_data, dict)
+    def __init__(self, init_data: dict = {}):
         for key, value in init_data.items():
             if hasattr(value, "keys"):
                 if isinstance(value, DotDict):
@@ -53,7 +54,7 @@ class DotDict(dict):
         return {key: convert(value) for key, value in self.items()}
 
 
-class ListNode(list):
+class ListNode(UserList):
     """
     A `ListNode` is a python list which can be added and multiplied
     with other `Node` and `ListNode` objects.
@@ -109,19 +110,19 @@ class ListNode(list):
     ... )
     >>> algorithms * datasets == Experiments(
     ...     [
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {"1": "1"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {"2": "2"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "2", "instance": "2"}),
     ...             Dataset({"path": {"1": "1"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "2", "instance": "2"}),
     ...             Dataset({"path": {"2": "2"}}),
     ...         ),
@@ -156,13 +157,15 @@ class ListNode(list):
         ):
             return Experiments(
                 [
-                    Experiment(node_1, node_2)
+                    Experiment.from_nodes(node_1, node_2)
                     for node_1 in self
                     for node_2 in other
                 ]
             )
         elif isinstance(other, Node):
-            return Experiments([Experiment(item, other) for item in self])
+            return Experiments(
+                [Experiment.from_nodes(item, other) for item in self]
+            )
 
         raise TypeError
 
@@ -178,7 +181,7 @@ class Experiments(ListNode):
 
     >>> experiments = Experiments(
     ...     [
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {"1": "1"}}),
     ...         )
@@ -196,10 +199,8 @@ class Experiments(ListNode):
         if not self.verify(experiments):
             raise TypeError
 
-        self.extend(
-            item
-            if isinstance(item, Experiment)
-            else Experiment(item["algorithm"], item["dataset"])
+        super().__init__(
+            item if isinstance(item, Experiment) else Experiment(item)
             for item in experiments
         )
 
@@ -210,10 +211,7 @@ class Experiments(ListNode):
         experiment. Any iterable containing valid `Experiment` objects
         are valid `Experiments` object.
         """
-        if not data or not isinstance(data, Iterable):
-            return False
-
-        return all(map(Experiment.verify, data))
+        return data and all(map(Experiment.verify, data))
 
     __mul__ = None  # Experiments cannot be multiplied
 
@@ -251,19 +249,19 @@ class Datasets(ListNode):
     ... )
     >>> datasets * algorithms == Experiments(
     ...     [
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {"1": "1"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "2", "instance": "2"}),
     ...             Dataset({"path": {"1": "1"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {"2": "2"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "2", "instance": "2"}),
     ...             Dataset({"path": {"2": "2"}}),
     ...         ),
@@ -287,8 +285,7 @@ class Datasets(ListNode):
     def __init__(self, iterable: Iterable):
         if not self.verify(iterable):
             raise TypeError
-
-        self.extend(Dataset(ds) for ds in iterable)
+        super().__init__(map(Dataset, iterable))
 
     @classmethod
     def verify(cls, data: Iterable) -> bool:
@@ -296,10 +293,7 @@ class Datasets(ListNode):
         Any non empty iterable with valid `Dataset`
         objects is a valid `Datasets` object.
         """
-        if not data or not isinstance(data, Iterable):
-            return False
-
-        return all(map(Dataset.verify, data))
+        return data and all(map(Dataset.verify, data))
 
 
 class Algorithms(ListNode):
@@ -335,19 +329,19 @@ class Algorithms(ListNode):
     ... )
     >>> algorithms * datasets == Experiments(
     ...     [
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {"1": "1"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {"2": "2"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "2", "instance": "2"}),
     ...             Dataset({"path": {"1": "1"}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "2", "instance": "2"}),
     ...             Dataset({"path": {"2": "2"}}),
     ...         ),
@@ -372,7 +366,7 @@ class Algorithms(ListNode):
         if not self.verify(data):
             raise TypeError
 
-        self.extend(Algorithm(algo) for algo in data)
+        super().__init__(map(Algorithm, data))
 
     @classmethod
     def verify(cls, data: Iterable) -> bool:
@@ -380,13 +374,10 @@ class Algorithms(ListNode):
         Any non empty iterable containing valid `Algorithm`
         objects is a valid `Algorithms` object.
         """
-        if not data or not isinstance(data, Iterable):
-            return False
-
-        return all(map(Algorithm.verify, data))
+        return data and all(map(Algorithm.verify, data))
 
 
-class Node(dict):
+class Node(UserDict):
     """
     A `Node` is a dictionary which can be added and multiplied with
     `Node` and `ListNode` objects.
@@ -433,9 +424,11 @@ class Node(dict):
         and returns an `Experiments` object containing the result.
         """
         if isinstance(other, Node):
-            return Experiments([Experiment(self, other)])
-        elif isinstance(other, ListNode):
-            return Experiments([Experiment(self, item) for item in other])
+            return Experiments([Experiment.from_nodes(self, other)])
+        if isinstance(other, ListNode):
+            return Experiments(
+                [Experiment.from_nodes(self, item) for item in other]
+            )
 
         raise TypeError(f"Unable to multiply {type(self)} with {type(other)}")
 
@@ -464,14 +457,17 @@ class Algorithm(Node):
     `Algorithms` object.
 
     >>> algorithm = Algorithm({"image": "", "instance": ""})
-    >>> algorithm + algorithm
-    Algorithms([Algorithm({'image': '', 'instance': ''}), Algorithm({'image': '', 'instance': ''})])
+    >>> algorithm + algorithm == Algorithms([algorithm, algorithm])
+    True
 
     An `Algorithm` can be multiplied with a `Dataset` object to form an
     `Experiments` object.
 
-    >>> algorithm * Dataset({"path": {}})
-    Experiments([Experiment({'algorithm': Algorithm({'image': '', 'instance': ''}), 'dataset': Dataset({'path': {}})})])
+    >>> dataset = Dataset({"path": {}})
+    >>> algorithm * dataset == Experiments(
+    ...     [Experiment.from_nodes(algorithm, dataset)]
+    ... )
+    True
 
     An Algorithm can also be multiplied with a `Datasets` object in order to
     form several `Experiment` objects at once.
@@ -479,11 +475,11 @@ class Algorithm(Node):
     ...     [{"path": {"1": ""}}, {"path": {"2": ""}}]
     ... ) == Experiments(
     ...     [
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "", "instance": ""}),
     ...             Dataset({"path": {"1": ""}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "", "instance": ""}),
     ...             Dataset({"path": {"2": ""}}),
     ...         ),
@@ -521,9 +517,8 @@ class Algorithm(Node):
         True
         """
         return (
-            isinstance(data, dict)
-            and isinstance(data.get("image", None), str)
-            and isinstance(data.get("instance", None), str)
+            isinstance(data.get("image"), str)
+            and isinstance(data.get("instance"), str)
             and isinstance(data.get("hyperparameters", {}), dict)
         )
 
@@ -544,8 +539,11 @@ class Dataset(Node):
     An `Algorithm` can be multiplied with a `Dataset` object
     to form an `Experiments` object.
 
-    >>> dataset * Algorithm({"image": "", "instance": ""})
-    Experiments([Experiment({'algorithm': Algorithm({'image': '', 'instance': ''}), 'dataset': Dataset({'path': {}})})])
+    >>> algorithm = Algorithm({"image": "", "instance": ""})
+    >>> dataset * algorithm == (
+    ...     Experiments([Experiment.from_nodes(algorithm, dataset)])
+    ... )
+    True
 
     A `Dataset` can also be multiplied with an `Algorithms` object in order to
     form several `Experiment` objects at once.
@@ -557,11 +555,11 @@ class Dataset(Node):
     ...     ]
     ... ) == Experiments(
     ...     [
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "1", "instance": "1"}),
     ...             Dataset({"path": {}}),
     ...         ),
-    ...         Experiment(
+    ...         Experiment.from_nodes(
     ...             Algorithm({"image": "2", "instance": "2"}),
     ...             Dataset({"path": {}}),
     ...         ),
@@ -599,10 +597,8 @@ class Dataset(Node):
         - path: Dict
         - meta: Optional[Dict]
         """
-        return (
-            isinstance(data, dict)
-            and isinstance(data.get("path", None), dict)
-            and isinstance(data.get("meta", {}), dict)
+        return isinstance(data.get("path"), dict) and isinstance(
+            data.get("meta", {}), dict
         )
 
 
@@ -615,8 +611,10 @@ class Experiment(Node):
     Two experiments can be added to form an `Experiments` object.
 
     >>> experiment = Experiment(
-    ...     Algorithm({"image": "", "instance": ""}),
-    ...     Dataset({"path": {}}),
+    ...     {
+    ...         "algorithm": {"image": "", "instance": ""},
+    ...         "dataset": {"path": {}}
+    ...     }
     ... )
     >>> type(experiment + experiment)
     <class 'runtool.datatypes.Experiments'>
@@ -624,37 +622,21 @@ class Experiment(Node):
     Upon instantiating a `Experiment` object the `Experiment.verify` method checks
     that the parameter has the correct structure. If it does not, a TypeError
     is raised.
-
-    >>> Experiment({"a": 1}, "smth")
-    Traceback (most recent call last):
-        ...
-    TypeError: An Experiment requires one Dataset and one Algorithm, got: {'a': 1} and smth
-
-    >>> Experiment(
-    ...     Algorithm({"image": "", "instance": ""}),
-    ...     Dataset({"path": {}}),
-    ... )
-    Experiment({'algorithm': Algorithm({'image': '', 'instance': ''}), 'dataset': Dataset({'path': {}})})
-
     """
 
     # __add__ should return an Experiments object
     result_type = Experiments
 
-    def __init__(self, node: dict, node_2: Optional[dict] = None):
-        # If passing two nodes, figure out which is an algorithm
-        # and which is a dataset and generate a new Experiment
-        # object from it.
-        if node_2 is not None:
-            node = Experiment.from_nodes(node, node_2)
-
-        # If passing one node, make sure it is a valid Experiment node
-        elif not Experiment.verify(node):
+    def __init__(self, node: dict):
+        super().__init__(node)
+        if not Experiment.verify(self):
             raise TypeError(
                 "An Experiment requires a dict containing a valid "
-                f"Dataset and an Algorithm, got: {node}"
+                f"Dataset and an Algorithm, got: {dict(self)}"
             )
-        self.update(node)
+
+    def to_dict(self):
+        return dict(valmap(dict, self))
 
     @classmethod
     def from_nodes(cls, node_1: dict, node_2: dict) -> "Experiment":
@@ -685,10 +667,8 @@ class Experiment(Node):
             "dataset": Dataset
         }
         """
-        return (
-            isinstance(data, dict)
-            and Algorithm.verify(data.get("algorithm", None))
-            and Dataset.verify(data.get("dataset", None))
+        return Algorithm.verify(data.get("algorithm", {})) and Dataset.verify(
+            data.get("dataset", {})
         )
 
     __mul__ = None  # An Experiment cannot be multiplied

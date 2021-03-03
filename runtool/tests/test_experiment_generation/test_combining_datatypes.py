@@ -28,7 +28,7 @@ DATASET = Dataset(
     }
 )
 
-EXPERIMENT = Experiment(ALGORITHM, DATASET)
+EXPERIMENT = Experiment.from_nodes(ALGORITHM, DATASET)
 ALGORITHMS = lambda num: Algorithms([ALGORITHM] * num)
 DATASETS = lambda num: Datasets([DATASET] * num)
 EXPERIMENTS = lambda num: Experiments([EXPERIMENT] * num)
