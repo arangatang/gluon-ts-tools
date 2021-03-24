@@ -631,3 +631,7 @@ def test_large_example():
 
 def test_complex_example():
     assert_config_equal(**load("complex_example"))
+
+
+def test_each_example():
+    assert_config_equal(**load("each_example"))

@@ -1,0 +1,63 @@
+-
+  algorithm:
+    image: smth
+    instance: ml.g4dn.2xlarge
+    hyperparameters:
+      num_workers: 1
+  dataset:
+    path:
+        train: s3://gluonts-run-tool/gluon_ts_datasets/electricity/train/data.json
+        test: s3://gluonts-run-tool/gluon_ts_datasets/electricity/test/data.json
+  algorithms:
+    - 
+      image: smth
+      instance: ml.g4dn.2xlarge
+      hyperparameters:
+        num_workers: 1
+  datasets:
+    - 
+      path:
+        train: s3://gluonts-run-tool/gluon_ts_datasets/electricity/train/data.json
+        test: s3://gluonts-run-tool/gluon_ts_datasets/electricity/test/data.json
+-
+  algorithm:
+    image: smth
+    instance: ml.g4dn.2xlarge
+    hyperparameters:
+      num_workers: 2
+  dataset:
+    path:
+        train: s3://gluonts-run-tool/gluon_ts_datasets/electricity/train/data.json
+        test: s3://gluonts-run-tool/gluon_ts_datasets/electricity/test/data.json
+  algorithms:
+    - 
+      image: smth
+      instance: ml.g4dn.2xlarge
+      hyperparameters:
+        num_workers: 2
+  datasets:
+    - 
+      path:
+        train: s3://gluonts-run-tool/gluon_ts_datasets/electricity/train/data.json
+        test: s3://gluonts-run-tool/gluon_ts_datasets/electricity/test/data.json
+-
+  algorithm:
+    image: smth
+    instance: ml.g4dn.2xlarge
+    hyperparameters:
+      num_workers: 3
+  dataset:
+    path:
+        train: s3://gluonts-run-tool/gluon_ts_datasets/electricity/train/data.json
+        test: s3://gluonts-run-tool/gluon_ts_datasets/electricity/test/data.json
+  algorithms:
+    - 
+      image: smth
+      instance: ml.g4dn.2xlarge
+      hyperparameters:
+        num_workers: 3
+  datasets:
+    - 
+      path:
+        train: s3://gluonts-run-tool/gluon_ts_datasets/electricity/train/data.json
+        test: s3://gluonts-run-tool/gluon_ts_datasets/electricity/test/data.json
