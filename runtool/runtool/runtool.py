@@ -241,17 +241,18 @@ def generate_versions(data: Iterable[dict]) -> Dict[Any, Versions]:
     ...     [
     ...         {"a":1},
     ...         {"a":2,"b":3},
+    ...         {"a":1}
     ...     ]
     ... )
     {'a': Versions([1, 2]), 'b': 3}
     """
-
     # creates a new Versions object for any new keys and appends
     # the value to the created Versions object
     result = defaultdict(Versions)
     for dct in data:
         for key, value in dct.items():
-            result[key].append(value)
+            if value not in result[key]:
+                result[key].append(value)
     return dict(result)
 
 

@@ -95,3 +95,40 @@ def test_all_in_one():
             "experiments": Versions([Experiments([EXPERIMENT])]),
         },
     )
+
+
+def test_each():
+    compare(
+        {
+            "algorithm": {
+                "image": "smth",
+                "instance": {"$each": ["foo", "bar", "baz"]},
+            },
+            "dataset": {"path": {}},
+        },
+        {
+            "algorithm": Versions(
+                [
+                    Algorithm(
+                        {
+                            "image": "smth",
+                            "instance": "foo",
+                        }
+                    ),
+                    Algorithm(
+                        {
+                            "image": "smth",
+                            "instance": "bar",
+                        }
+                    ),
+                    Algorithm(
+                        {
+                            "image": "smth",
+                            "instance": "baz",
+                        }
+                    ),
+                ]
+            ),
+            "dataset": Versions([Dataset({"path": {}})]),
+        },
+    )
